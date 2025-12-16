@@ -221,7 +221,3 @@ The application settings can be configured through the Settings UI:
 - Implement proper error handling with anyhow/thiserror
 - Use structured logging with tracing
 - Write unit and integration tests
-
-## License
-
-MIT
