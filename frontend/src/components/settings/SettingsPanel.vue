@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { Folder, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElSwitch, ElTable, ElTableColumn, ElDialog } from 'element-plus'
 import { useAppStore } from '../../stores/app'
@@ -58,7 +58,11 @@ async function saveSettings() {
 async function resetSettings() {
   if (confirm('确定要重置所有设置为默认值吗？')) {
     try {
-      const defaultConfig = await appStore.resetSettings()
+      // Reset to default settings
+      appStore.settings.theme = 'light'
+      appStore.settings.fontSize = 14
+      appStore.settings.autoSave = true
+      await appStore.saveSettings()
       // TODO: Reset other settings
     } catch (error) {
       console.error('Failed to reset settings:', error)

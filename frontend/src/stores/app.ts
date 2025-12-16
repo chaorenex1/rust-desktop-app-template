@@ -51,34 +51,46 @@ export const useAppStore = defineStore('app', () => {
 
   // Actions
   async function initialize() {
-    try {
-      isLoading.value = true
-      error.value = null
+    isLoading.value = true
+    error.value = null
 
+    try {
       // Load settings from backend
-      const backendSettings = await invoke('get_settings')
-      if (backendSettings) {
-        settings.value = {
-          ...settings.value,
-          ...backendSettings,
+      try {
+        const backendSettings = await invoke('get_settings')
+        if (backendSettings) {
+          settings.value = {
+            ...settings.value,
+            ...backendSettings,
+          }
         }
+      } catch (err) {
+        console.warn('Failed to load settings from backend, using defaults:', err)
       }
 
       // Load workspaces
-      const workspaceList = await invoke('get_workspaces')
-      workspaces.value = workspaceList as Workspace[]
+      try {
+        const workspaceList = await invoke('get_workspaces')
+        workspaces.value = workspaceList as Workspace[]
+      } catch (err) {
+        console.warn('Failed to load workspaces from backend:', err)
+      }
 
       // Load AI models
-      const aiModels = await invoke('get_ai_models')
-      if (aiModels && Array.isArray(aiModels) && aiModels.length > 0) {
-        currentAiModel.value = aiModels[0] as string
+      try {
+        const aiModels = await invoke('get_ai_models')
+        if (aiModels && Array.isArray(aiModels) && aiModels.length > 0) {
+          currentAiModel.value = aiModels[0] as string
+        }
+      } catch (err) {
+        console.warn('Failed to load AI models from backend:', err)
       }
 
       isConnected.value = true
     } catch (err) {
       error.value = err instanceof Error ? err.message : '初始化失败'
       isConnected.value = false
-      throw err
+      console.error('Failed to initialize app:', err)
     } finally {
       isLoading.value = false
     }

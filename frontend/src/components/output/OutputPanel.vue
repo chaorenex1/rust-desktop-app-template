@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { Search, Delete, Pause, Play } from '@element-plus/icons-vue'
-import { ElInput, ElButton, ElIcon, ElSelect, ElOption, ElTooltip } from 'element-plus'
+import { ref, computed } from 'vue'
+import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue'
+import { ElInput, ElButton, ElSelect, ElOption, ElTooltip } from 'element-plus'
 
 const logs = ref<string[]>([
   '2024-01-15 10:30:25 INFO - 应用启动成功',

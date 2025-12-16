@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElContainer, ElHeader, ElMain, ElAside, ElFooter } from 'element-plus'
-import { Menu, Setting, Folder, Terminal, Message, Document } from '@element-plus/icons-vue'
+import { Menu, Setting, Folder, Message, Document } from '@element-plus/icons-vue'
 import FileExplorer from '../file-explorer/FileExplorer.vue'
 import CodeEditor from '../editor/CodeEditor.vue'
 import ChatPanel from '../chat/ChatPanel.vue'
@@ -23,7 +23,7 @@ const showBottomPanel = ref(true)
 const bottomTabs = [
   { key: 'chat', label: '聊天', icon: Message },
   { key: 'output', label: '输出', icon: Document },
-  { key: 'terminal', label: '终端', icon: Terminal },
+  { key: 'terminal', label: '终端', icon: Message },
 ]
 
 const activeBottomTab = ref('chat')

@@ -3,7 +3,6 @@ import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { ElNotification } from 'element-plus'
-import MainLayout from './components/layout/MainLayout.vue'
 import { useAppStore } from './stores/app'
 
 const appStore = useAppStore()
@@ -16,8 +15,6 @@ onMounted(async () => {
 
     // Listen to Tauri events
     await setupEventListeners()
-
-    isLoading.value = false
 
     ElNotification({
       title: '应用启动成功',
@@ -33,6 +30,9 @@ onMounted(async () => {
       type: 'error',
       duration: 5000,
     })
+  } finally {
+    // Always show the layout even if initialization fails
+    isLoading.value = false
   }
 })
 
@@ -110,7 +110,7 @@ async function setupEventListeners() {
       <p class="mt-4 text-text-secondary">正在初始化应用...</p>
     </div>
 
-    <MainLayout v-else />
+    <router-view v-else />
   </div>
 </template>
 

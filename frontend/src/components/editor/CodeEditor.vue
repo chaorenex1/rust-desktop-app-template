@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import * as monaco from 'monaco-editor'
-import { Save, SaveFilled, Close } from '@element-plus/icons-vue'
+import { Document, FolderOpened } from '@element-plus/icons-vue'
 import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip } from 'element-plus'
 import { useFileStore } from '../../stores/modules/files'
 
@@ -89,6 +89,8 @@ async function saveAllFiles() {
 // Close file
 function closeFile(index: number) {
   const file = fileStore.openedFiles[index]
+  if (!file) return
+  
   if (file.modified) {
     if (!confirm('文件有未保存的更改，确定要关闭吗？')) {
       return
@@ -111,18 +113,17 @@ function switchToFile(index: number) {
         v-model="fileStore.activeFileIndex"
         type="card"
         closable
-        @tab-click="switchToFile"
-        @tab-remove="closeFile"
+        @tab-click="(pane: any) => switchToFile(pane.props.name as number)"
+        @tab-remove="(name: any) => closeFile(name as number)"
       >
         <ElTabPane
           v-for="(file, index) in fileStore.openedFiles"
           :key="file.path"
-          :label="file.name"
           :name="index"
         >
           <template #label>
             <div class="flex items-center">
-              <span class="mr-2">{{ file.name.split('/').pop() }}</span>
+              <span class="mr-2">{{ file.path.split('/').pop() }}</span>
               <span v-if="file.modified" class="text-warning">*</span>
             </div>
           </template>
@@ -140,7 +141,7 @@ function switchToFile(index: number) {
         <div class="flex items-center space-x-2">
           <ElTooltip content="保存当前文件 (Ctrl+S)" placement="bottom">
             <ElButton
-              :icon="fileStore.activeFile?.modified ? SaveFilled : Save"
+              :icon="Document"
               :loading="isLoading"
               size="small"
               @click="saveCurrentFile"
@@ -151,7 +152,7 @@ function switchToFile(index: number) {
 
           <ElTooltip content="保存所有文件 (Ctrl+Shift+S)" placement="bottom">
             <ElButton
-              :icon="SaveFilled"
+              :icon="FolderOpened"
               :loading="isLoading"
               size="small"
               @click="saveAllFiles"
@@ -192,16 +193,6 @@ function switchToFile(index: number) {
     </div>
   </div>
 </template>
-
-<script lang="ts">
-import { Document } from '@element-plus/icons-vue'
-
-export default {
-  components: {
-    Document,
-  },
-}
-</script>
 
 <style scoped>
 :deep(.el-tabs__header) {

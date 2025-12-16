@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Link, Send, Delete, Setting } from '@element-plus/icons-vue'
+import { Link, Delete, Setting } from '@element-plus/icons-vue'
 import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElTag } from 'element-plus'
 import { useAppStore } from '../../stores/app'
 import { useFileStore } from '../../stores/modules/files'
@@ -55,8 +55,8 @@ function removeAssociatedFile(index: number) {
 }
 
 // Handle key press
-function handleKeyPress(event: KeyboardEvent) {
-  if (event.key === 'Enter' && !event.shiftKey) {
+function handleKeyPress(event: KeyboardEvent | Event) {
+  if (event instanceof KeyboardEvent && event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault()
     sendMessage()
   }
@@ -162,7 +162,7 @@ function handleKeyPress(event: KeyboardEvent) {
 
         <ElButton
           type="primary"
-          :icon="Send"
+          :icon="Setting"
           :loading="isLoading"
           @click="sendMessage"
         >

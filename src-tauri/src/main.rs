@@ -21,11 +21,6 @@ mod utils;
 
 /// Main entry point for the application
 fn main() {
-    // Initialize logging
-    utils::logging::init_logging();
-
-    info!("Starting Code AI Assistant...");
-
     tauri::Builder::default()
         // Register Tauri plugins
         .plugin(tauri_plugin_log::Builder::default().build())
@@ -78,6 +73,8 @@ fn main() {
 
         // Setup application state
         .setup(|app| {
+            info!("Starting Code AI Assistant...");
+            
             // Initialize application core
             core::app::init(app)?;
 
@@ -92,6 +89,6 @@ fn main() {
         })
 
         // Run the application
-        .run(tauri::generate_context!("tauri.conf.json"))
+        .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
