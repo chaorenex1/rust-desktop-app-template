@@ -50,6 +50,9 @@ importers:
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
+      vscode-material-icons:
+        specifier: ^0.1.1
+        version: 0.1.1
       vue:
         specifier: ^3.5.24
         version: 3.5.25(typescript@5.9.3)
@@ -916,6 +919,9 @@ packages:
       yaml:
         optional: true
 
+  vscode-material-icons@0.1.1:
+    resolution: {integrity: sha512-GsoEEF8Tbb0yUFQ6N6FPvh11kFkL9F95x0FkKlbbfRQN9eFms67h+L3t6b9cUv58dSn2gu8kEhNfoESVCrz4ag==}
+
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
 
@@ -1631,6 +1637,8 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
       lightningcss: 1.30.2
+
+  vscode-material-icons@0.1.1: {}
 
   vscode-uri@3.1.0: {}
 

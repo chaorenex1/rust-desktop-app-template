@@ -360,7 +360,15 @@ async function handleOpenTerminal(data: FileNode) {
       >
         <template #default="{ data }">
           <div class="tree-node-content flex items-center px-1 py-1 w-full">
+            <!-- Material Design Icon -->
+            <img
+              v-if="data.icon.isImage"
+              :src="data.icon.icon"
+              class="file-icon mr-2 flex-shrink-0"
+              :alt="data.name"
+            />
             <span
+              v-else
               class="mr-2 text-base leading-none flex-shrink-0"
               :style="{ color: data.icon.color }"
             >
@@ -437,6 +445,13 @@ async function handleOpenTerminal(data: FileNode) {
 /* Context menu styling */
 .tree-node-content {
   position: relative;
+}
+
+/* Material Design Icon */
+.file-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
 .context-menu-trigger {
