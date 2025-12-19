@@ -12,8 +12,7 @@ onMounted(async () => {
     // Initialize application
     await appStore.initialize();
     // Theme
-    themeStore.setTheme(appStore.settings.theme);
-    themeStore.setColorScheme(appStore.settings.colorScheme);
+    themeStore.initialize(appStore.settings.theme, appStore.settings.colorScheme);
 
     // Listen to Tauri events
     // await setupEventListeners();
