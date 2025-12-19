@@ -22,6 +22,11 @@ const sidebarWidth = ref(256);
 // 固定底部面板高度（像素），避免位置随窗口变化上下浮动
 const bottomPanelHeight = 300;
 
+// Sidebar resize state
+const isResizingSidebar = ref(false);
+let sidebarStartX = 0;
+let sidebarStartWidth = 0;
+
 // Bottom panel tabs
 const bottomTabs = [
   { key: 'chat', label: '聊天', icon: Message },
@@ -40,36 +45,39 @@ function toggleFileExplorer() {
 }
 
 // Sidebar resize handlers
-// function onSidebarResizeStart(event: MouseEvent) {
-//   isResizingSidebar.value = true;
-//   sidebarStartX = event.clientX;
-//   sidebarStartWidth = sidebarWidth.value;
+function onSidebarResizeStart(event: MouseEvent) {
+  isResizingSidebar.value = true;
+  sidebarStartX = event.clientX;
+  sidebarStartWidth = sidebarWidth.value;
 
-//   document.addEventListener('mousemove', onSidebarResizing);
-//   document.addEventListener('mouseup', onSidebarResizeEnd);
-// }
+  document.addEventListener('mousemove', onSidebarResizing);
+  document.addEventListener('mouseup', onSidebarResizeEnd);
+  
+  // 防止文本选择
+  event.preventDefault();
+}
 
-// function onSidebarResizing(event: MouseEvent) {
-//   if (!isResizingSidebar.value) return;
+function onSidebarResizing(event: MouseEvent) {
+  if (!isResizingSidebar.value) return;
 
-//   const delta = event.clientX - sidebarStartX;
-//   const minWidth = 180;
-//   const maxWidth = 480;
-//   let nextWidth = sidebarStartWidth + delta;
+  const delta = event.clientX - sidebarStartX;
+  const minWidth = 180;
+  const maxWidth = 600;
+  let nextWidth = sidebarStartWidth + delta;
 
-//   if (nextWidth < minWidth) nextWidth = minWidth;
-//   if (nextWidth > maxWidth) nextWidth = maxWidth;
+  if (nextWidth < minWidth) nextWidth = minWidth;
+  if (nextWidth > maxWidth) nextWidth = maxWidth;
 
-//   sidebarWidth.value = nextWidth;
-// }
+  sidebarWidth.value = nextWidth;
+}
 
-// function onSidebarResizeEnd() {
-//   if (!isResizingSidebar.value) return;
+function onSidebarResizeEnd() {
+  if (!isResizingSidebar.value) return;
 
-//   isResizingSidebar.value = false;
-//   document.removeEventListener('mousemove', onSidebarResizing);
-//   document.removeEventListener('mouseup', onSidebarResizeEnd);
-// }
+  isResizingSidebar.value = false;
+  document.removeEventListener('mousemove', onSidebarResizing);
+  document.removeEventListener('mouseup', onSidebarResizeEnd);
+}
 
 // Open settings page
 function openSettings() {
@@ -193,7 +201,11 @@ function handleSwitchToTerminal(event: Event) {
 
     <!-- Main Content -->
     <ElContainer class="flex-1">
-      <MainSidebar :visible="showFileExplorer" :width="sidebarWidth" />
+      <MainSidebar 
+        :visible="showFileExplorer" 
+        :width="sidebarWidth" 
+        @resize-start="onSidebarResizeStart"
+      />
 
       <!-- Main Content Area -->
       <ElMain class="flex-1 overflow-hidden min-w-0">
