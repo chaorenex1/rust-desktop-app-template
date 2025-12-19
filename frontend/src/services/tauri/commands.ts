@@ -12,7 +12,24 @@ import type {
 
 // File system commands
 export async function readFile(path: string): Promise<FileContent> {
-  return invoke('read_file', { path });
+  const result = await invoke<{
+    name: string;
+    path: string;
+    content: string;
+    modified: boolean;
+    line_count: number;
+    size: number;
+  }>('read_file', { path });
+
+  // 转换为前端 FileContent 格式
+  return {
+    name: result.name,
+    path: result.path,
+    content: result.content,
+    modified: result.modified,
+    lineCount: result.line_count, // 转换蛇形到驼峰
+    size: result.size,
+  };
 }
 
 export async function writeFile(path: string, content: string): Promise<void> {

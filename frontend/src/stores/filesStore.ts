@@ -93,6 +93,13 @@ export const useFileStore = defineStore('files', () => {
       currentFile.value = fileItem;
 
       const fileContent = await readFile(path);
+      console.debug('Read file content:', {
+        path: fileContent.path,
+        contentLength: fileContent.content.length,
+        lineCount: fileContent.lineCount,
+        size: fileContent.size,
+      });
+      
       fileContent.language = getFileIcon(fileItem);
       fileContent.size = fileItem.size || 0;
 
@@ -237,18 +244,6 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
-  function updateFileContent(content: string) {
-    if (activeFileIndex.value >= 0) {
-      const existing = openedFiles.value[activeFileIndex.value]!;
-      openedFiles.value[activeFileIndex.value] = {
-        path: existing.path,
-        content,
-        language: existing.language,
-        modified: true,
-      };
-    }
-  }
-
   // 从磁盘刷新当前活动文件内容（不标记为已修改）
   function refreshActiveFileContentFromDisk(content: string) {
     if (activeFileIndex.value >= 0) {
@@ -267,9 +262,18 @@ export const useFileStore = defineStore('files', () => {
     if (fileIndex >= 0) {
       openedFiles.value.splice(fileIndex, 1);
 
-      // Update active file index
-      if (activeFileIndex.value >= fileIndex) {
-        activeFileIndex.value = Math.max(0, activeFileIndex.value - 1);
+      // 如果关闭的是当前文件之前的文件，索引需要减1
+      if (activeFileIndex.value > fileIndex) {
+        activeFileIndex.value--;
+      }
+      // 如果关闭的是当前文件
+      else if (activeFileIndex.value === fileIndex) {
+        // 如果还有文件，保持当前索引或移到前一个
+        if (openedFiles.value.length > 0) {
+          activeFileIndex.value = Math.min(fileIndex, openedFiles.value.length - 1);
+        } else {
+          activeFileIndex.value = -1;
+        }
       }
     }
   }
@@ -352,7 +356,6 @@ export const useFileStore = defineStore('files', () => {
     createFile,
     deleteFile,
     renameFile,
-    updateFileContent,
     refreshActiveFileContentFromDisk,
     closeFile,
     closeAllFiles,

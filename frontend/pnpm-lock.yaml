@@ -50,9 +50,6 @@ importers:
       tailwindcss:
         specifier: ^4.1.18
         version: 4.1.18
-      vscode-material-icons:
-        specifier: ^0.1.1
-        version: 0.1.1
       vue:
         specifier: ^3.5.24
         version: 3.5.25(typescript@5.9.3)
@@ -84,6 +81,9 @@ importers:
       vite:
         specifier: ^7.3.0
         version: 7.3.0(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.30.2)
+      vite-plugin-monaco-editor:
+        specifier: 1.1.0
+        version: 1.1.0(monaco-editor@0.50.0)
       vue-tsc:
         specifier: ^3.1.4
         version: 3.1.8(typescript@5.9.3)
@@ -879,6 +879,11 @@ packages:
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
+  vite-plugin-monaco-editor@1.1.0:
+    resolution: {integrity: sha512-IvtUqZotrRoVqwT0PBBDIZPNraya3BxN/bfcNfnxZ5rkJiGcNtO5eAOWWSgT7zullIAEqQwxMU83yL9J5k7gww==}
+    peerDependencies:
+      monaco-editor: '>=0.33.0'
+
   vite@7.3.0:
     resolution: {integrity: sha512-dZwN5L1VlUBewiP6H9s2+B3e3Jg96D0vzN+Ry73sOefebhYr9f94wwkMNN/9ouoU8pV1BqA1d1zGk8928cx0rg==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -918,9 +923,6 @@ packages:
         optional: true
       yaml:
         optional: true
-
-  vscode-material-icons@0.1.1:
-    resolution: {integrity: sha512-GsoEEF8Tbb0yUFQ6N6FPvh11kFkL9F95x0FkKlbbfRQN9eFms67h+L3t6b9cUv58dSn2gu8kEhNfoESVCrz4ag==}
 
   vscode-uri@3.1.0:
     resolution: {integrity: sha512-/BpdSx+yCQGnCvecbyXdxHDkuk55/G3xwnC0GqY4gmQ3j+A+g8kzzgB4Nk/SINjqn6+waqw3EgbVF2QKExkRxQ==}
@@ -1624,6 +1626,10 @@ snapshots:
 
   undici-types@7.16.0: {}
 
+  vite-plugin-monaco-editor@1.1.0(monaco-editor@0.50.0):
+    dependencies:
+      monaco-editor: 0.50.0
+
   vite@7.3.0(@types/node@24.10.4)(jiti@2.6.1)(lightningcss@1.30.2):
     dependencies:
       esbuild: 0.27.1
@@ -1637,8 +1643,6 @@ snapshots:
       fsevents: 2.3.3
       jiti: 2.6.1
       lightningcss: 1.30.2
-
-  vscode-material-icons@0.1.1: {}
 
   vscode-uri@3.1.0: {}
 

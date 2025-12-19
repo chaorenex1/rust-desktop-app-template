@@ -1,18 +1,26 @@
 import path from 'path';
-
+import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
-import { defineConfig } from 'vite';
+import monacoEditorPlugin from 'vite-plugin-monaco-editor';
+
+// @ts-ignore - vite-plugin-monaco-editor 使用 CommonJS 导出
+const { default: monacoEditor } = monacoEditorPlugin as any;
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [vue(), tailwindcss(), monacoEditorPlugin({})],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+
+  // Monaco Editor 优化配置
+  optimizeDeps: {
+    include: ['monaco-editor'],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

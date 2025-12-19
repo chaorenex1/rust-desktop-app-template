@@ -44,12 +44,22 @@ pub async fn read_file(path: String) -> Result<FileContent, String> {
         error!("Failed to read file {}: {:?}", path, e);
         e.to_string()
     })?;
+    
+    // 计算行数
+    let line_count = content.lines().count();
+    
+    // 兼容 Windows 和 Unix 路径分隔符
+    let name = path.split(&['/', '\\'][..])
+        .last()
+        .unwrap_or_default()
+        .to_string();
+    
     Ok(FileContent {
-        name: path.split('/').last().unwrap_or_default().to_string(),
+        name,
         path,
         content,
         modified: false,
-        line_count:0,
+        line_count,
         size: metadata.len(),
     })
 }
@@ -88,12 +98,20 @@ pub async fn read_max_file(path: String) -> Result<FileContent, String> {
         })?;
 
     let content = String::from_utf8_lossy(&bytes).to_string();
+    let line_count = content.lines().count();
+    
+    // 兼容 Windows 和 Unix 路径分隔符
+    let name = path.split(&['/', '\\'][..])
+        .last()
+        .unwrap_or_default()
+        .to_string();
+    
     Ok(FileContent {
-        name: path.split('/').last().unwrap_or_default().to_string(),
+        name,
         path,
         content,
         modified: false,
-        line_count: 0,
+        line_count,
         size: metadata.len(),
     })
 }
