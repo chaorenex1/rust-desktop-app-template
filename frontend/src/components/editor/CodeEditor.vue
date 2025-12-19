@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import * as monaco from 'monaco-editor'
-import { Document, FolderOpened } from '@element-plus/icons-vue'
-import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip } from 'element-plus'
-import { useFileStore } from '../../stores/modules/files'
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import * as monaco from 'monaco-editor';
+import { Document, FolderOpened } from '@element-plus/icons-vue';
+import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip } from 'element-plus';
+import { useFileStore } from '../../stores/filesStore';
 
-const fileStore = useFileStore()
-const editorContainer = ref<HTMLElement>()
-const editor = ref<monaco.editor.IStandaloneCodeEditor>()
-const isLoading = ref(false)
+const fileStore = useFileStore();
+const editorContainer = ref<HTMLElement>();
+const editor = ref<monaco.editor.IStandaloneCodeEditor>();
+const isLoading = ref(false);
 
 // Initialize Monaco Editor
 onMounted(async () => {
-  await nextTick()
+  await nextTick();
 
   if (editorContainer.value) {
     editor.value = monaco.editor.create(editorContainer.value, {
@@ -27,81 +27,85 @@ onMounted(async () => {
       automaticLayout: true,
       formatOnPaste: true,
       formatOnType: true,
-    })
+    });
 
     // Listen to content changes
     editor.value.onDidChangeModelContent(() => {
       if (fileStore.activeFile) {
-        const content = editor.value?.getValue() || ''
-        fileStore.updateFileContent(content)
+        const content = editor.value?.getValue() || '';
+        fileStore.updateFileContent(content);
       }
-    })
+    });
   }
 
   // Watch for active file changes
-  watch(() => fileStore.activeFile, (newFile) => {
-    if (newFile && editor.value) {
-      const model = editor.value.getModel()
-      if (model) {
-        model.setValue(newFile.content)
-        monaco.editor.setModelLanguage(model, newFile.language || 'plaintext')
+  watch(
+    () => fileStore.activeFile,
+    (newFile) => {
+      if (newFile && editor.value) {
+        const model = editor.value.getModel();
+        if (model) {
+          model.setValue(newFile.content);
+          monaco.editor.setModelLanguage(model, newFile.language || 'plaintext');
+        }
+      } else if (editor.value) {
+        editor.value.setValue('');
       }
-    } else if (editor.value) {
-      editor.value.setValue('')
-    }
-  }, { immediate: true })
-})
+    },
+    { immediate: true }
+  );
+});
 
 // Cleanup on unmount
 onUnmounted(() => {
   if (editor.value) {
-    editor.value.dispose()
+    editor.value.dispose();
   }
-})
+});
 
 // Save current file
 async function saveCurrentFile() {
-  if (!fileStore.activeFile) return
+  if (!fileStore.activeFile) return;
 
   try {
-    isLoading.value = true
-    const content = editor.value?.getValue() || ''
-    await fileStore.saveFile(content)
+    isLoading.value = true;
+    const content = editor.value?.getValue() || '';
+    await fileStore.saveFile(content);
   } catch (error) {
-    console.error('Failed to save file:', error)
+    console.error('Failed to save file:', error);
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 
 // Save all files
 async function saveAllFiles() {
   try {
-    isLoading.value = true
-    await fileStore.saveAllFiles()
+    isLoading.value = true;
+    await fileStore.saveAllFiles();
   } catch (error) {
-    console.error('Failed to save all files:', error)
+    console.error('Failed to save all files:', error);
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 
 // Close file
 function closeFile(index: number) {
-  const file = fileStore.openedFiles[index]
-  if (!file) return
-  
+  const file = fileStore.openedFiles[index];
+  if (!file) return;
+
   if (file.modified) {
     if (!confirm('文件有未保存的更改，确定要关闭吗？')) {
-      return
+      return;
     }
   }
-  fileStore.closeFile(file.path)
+  fileStore.closeFile(file.path);
 }
 
 // Switch to file
 function switchToFile(index: number) {
-  fileStore.setActiveFile(index)
+  fileStore.setActiveFile(index);
 }
 </script>
 
@@ -116,11 +120,7 @@ function switchToFile(index: number) {
         @tab-click="(pane: any) => switchToFile(pane.props.name as number)"
         @tab-remove="(name: any) => closeFile(name as number)"
       >
-        <ElTabPane
-          v-for="(file, index) in fileStore.openedFiles"
-          :key="file.path"
-          :name="index"
-        >
+        <ElTabPane v-for="(file, index) in fileStore.openedFiles" :key="file.path" :name="index">
           <template #label>
             <div class="flex items-center">
               <span class="mr-2">{{ file.path.split('/').pop() }}</span>
@@ -140,23 +140,13 @@ function switchToFile(index: number) {
 
         <div class="flex items-center space-x-2">
           <ElTooltip content="保存当前文件 (Ctrl+S)" placement="bottom">
-            <ElButton
-              :icon="Document"
-              :loading="isLoading"
-              size="small"
-              @click="saveCurrentFile"
-            >
+            <ElButton :icon="Document" :loading="isLoading" size="small" @click="saveCurrentFile">
               保存
             </ElButton>
           </ElTooltip>
 
           <ElTooltip content="保存所有文件 (Ctrl+Shift+S)" placement="bottom">
-            <ElButton
-              :icon="FolderOpened"
-              :loading="isLoading"
-              size="small"
-              @click="saveAllFiles"
-            >
+            <ElButton :icon="FolderOpened" :loading="isLoading" size="small" @click="saveAllFiles">
               全部保存
             </ElButton>
           </ElTooltip>
@@ -179,15 +169,13 @@ function switchToFile(index: number) {
       <div class="flex items-center justify-between">
         <div>
           <span v-if="fileStore.activeFile">
-            行: {{ editor?.getModel()?.getLineCount() || 0 }} |
-            列: {{ editor?.getPosition()?.column || 1 }}
+            行: {{ editor?.getModel()?.getLineCount() || 0 }} | 列:
+            {{ editor?.getPosition()?.column || 1 }}
           </span>
         </div>
 
         <div>
-          <span v-if="fileStore.activeFile?.modified" class="text-warning">
-            有未保存的更改
-          </span>
+          <span v-if="fileStore.activeFile?.modified" class="text-warning"> 有未保存的更改 </span>
         </div>
       </div>
     </div>

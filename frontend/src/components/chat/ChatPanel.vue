@@ -1,34 +1,34 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Link, Delete, Setting } from '@element-plus/icons-vue'
-import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElTag } from 'element-plus'
-import { useAppStore } from '../../stores/app'
-import { useFileStore } from '../../stores/modules/files'
+import { ref, computed } from 'vue';
+import { Link, Delete, Setting } from '@element-plus/icons-vue';
+import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElTag } from 'element-plus';
+import { useAppStore } from '../../stores/appStore';
+import { useFileStore } from '../../stores/filesStore';
 
-const appStore = useAppStore()
-const fileStore = useFileStore()
+const appStore = useAppStore();
+const fileStore = useFileStore();
 
-const message = ref('')
-const isLoading = ref(false)
-const associatedFiles = ref<string[]>([])
+const message = ref('');
+const isLoading = ref(false);
+const associatedFiles = ref<string[]>([]);
 
 // Send message
 async function sendMessage() {
-  if (!message.value.trim() || isLoading.value) return
+  if (!message.value.trim() || isLoading.value) return;
 
   try {
-    isLoading.value = true
+    isLoading.value = true;
 
     // TODO: Send to AI backend
-    console.log('Sending message:', message.value)
-    console.log('Associated files:', associatedFiles.value)
+    console.log('Sending message:', message.value);
+    console.log('Associated files:', associatedFiles.value);
 
     // Clear message
-    message.value = ''
+    message.value = '';
   } catch (error) {
-    console.error('Failed to send message:', error)
+    console.error('Failed to send message:', error);
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 
@@ -42,23 +42,23 @@ function clearChat() {
 // Associate file
 function associateFile() {
   if (fileStore.activeFile) {
-    const filePath = fileStore.activeFile.path
+    const filePath = fileStore.activeFile.path;
     if (!associatedFiles.value.includes(filePath)) {
-      associatedFiles.value.push(filePath)
+      associatedFiles.value.push(filePath);
     }
   }
 }
 
 // Remove associated file
 function removeAssociatedFile(index: number) {
-  associatedFiles.value.splice(index, 1)
+  associatedFiles.value.splice(index, 1);
 }
 
 // Handle key press
 function handleKeyPress(event: KeyboardEvent | Event) {
   if (event instanceof KeyboardEvent && event.key === 'Enter' && !event.shiftKey) {
-    event.preventDefault()
-    sendMessage()
+    event.preventDefault();
+    sendMessage();
   }
 }
 </script>
@@ -72,9 +72,7 @@ function handleKeyPress(event: KeyboardEvent | Event) {
           <ElIcon :size="14" class="mr-1"><Link /></ElIcon>
           关联文件:
         </div>
-        <ElButton size="small" text @click="associateFile">
-          添加当前文件
-        </ElButton>
+        <ElButton size="small" text @click="associateFile"> 添加当前文件 </ElButton>
       </div>
       <div class="flex flex-wrap gap-1">
         <ElTag
@@ -91,9 +89,7 @@ function handleKeyPress(event: KeyboardEvent | Event) {
 
     <!-- Chat Messages Area -->
     <div class="flex-1 overflow-auto p-4">
-      <div class="text-center text-text-secondary">
-        聊天功能开发中...
-      </div>
+      <div class="text-center text-text-secondary">聊天功能开发中...</div>
     </div>
 
     <!-- Input Area -->
@@ -129,21 +125,11 @@ function handleKeyPress(event: KeyboardEvent | Event) {
 
         <div class="flex items-center space-x-2">
           <ElTooltip content="关联当前文件" placement="bottom">
-            <ElButton
-              :icon="Link"
-              size="small"
-              text
-              @click="associateFile"
-            />
+            <ElButton :icon="Link" size="small" text @click="associateFile" />
           </ElTooltip>
 
           <ElTooltip content="清空聊天" placement="bottom">
-            <ElButton
-              :icon="Delete"
-              size="small"
-              text
-              @click="clearChat"
-            />
+            <ElButton :icon="Delete" size="small" text @click="clearChat" />
           </ElTooltip>
         </div>
       </div>
@@ -160,12 +146,7 @@ function handleKeyPress(event: KeyboardEvent | Event) {
           class="flex-1"
         />
 
-        <ElButton
-          type="primary"
-          :icon="Setting"
-          :loading="isLoading"
-          @click="sendMessage"
-        >
+        <ElButton type="primary" :icon="Setting" :loading="isLoading" @click="sendMessage">
           发送
         </ElButton>
       </div>
@@ -183,7 +164,9 @@ function handleKeyPress(event: KeyboardEvent | Event) {
 
 <style scoped>
 :deep(.el-textarea__inner) {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
+    'Helvetica Neue', sans-serif;
   line-height: 1.5;
 }
 

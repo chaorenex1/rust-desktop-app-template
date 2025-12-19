@@ -1,263 +1,248 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import type { Workspace, AppSettings, Theme, EditorSettings } from '@/utils/types'
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import type { UnlistenFn } from '@tauri-apps/api/event';
+import type { AppSettings, Workspace } from '@/utils/types';
+import {
+  getSettings,
+  saveSettings,
+  getCurrentWorkspace,
+  getWorkspaces,
+  deleteWorkspace as deleteWorkspaceCommand,
+  createWorkspace as createWorkspaceCommand,
+  switchWorkspace as switchWorkspaceCommand
+} from '@/services/tauri/commands';
+import { de } from 'element-plus/es/locales.mjs';
+// import {} from '@/services/tauri/events';
 
 export const useAppStore = defineStore('app', () => {
   // State
-  const currentWorkspace = ref<Workspace | null>(null)
-  const workspaces = ref<Workspace[]>([])
-  const settings = ref<AppSettings>({
+  const currentWorkspace = ref<Workspace>({
+    id: '',
+    name: '',
+    path: '',
+    isActive: false,
+    createdAt: '',
+    updatedAt: '',
+    settings: {},
+  });
+  const isConnected = ref(false);
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
+  const defaultSettings = ref<AppSettings>({
     theme: 'light',
+    colorScheme: 'light',
     editor: {
       fontSize: 14,
-      tabSize: 2,
+      tabSize: 4,
       wordWrap: 'off',
       minimap: { enabled: true },
       lineNumbers: 'on',
-      autoSave: true,
+      autoSave: false,
       autoSaveDelay: 1000,
-      formatOnSave: true
+      formatOnSave: false,
+      enableFileWatcher: true,
     },
     terminal: {
       fontSize: 14,
-      fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+      fontFamily: 'monospace',
       cursorStyle: 'block',
-      cursorBlink: true
+      cursorBlink: true,
     },
     chat: {
       autoScroll: true,
       markdownPreview: true,
-      sendWithEnter: true
+      sendWithEnter: true,
+      switchLineWithShiftEnter: true,
     },
     ai: {
       defaultModel: 'claude-3-5-sonnet',
-      maxTokens: 4096,
+      maxTokens: 2048,
       temperature: 0.7,
-      topP: 0.9
+      topP: 1.0,
+      model_list: ['claude-4', 'gpt-5', 'deepseek'],
+      code_cli: ['claude-cli', 'codex-cli', 'gemini-cli'],
     },
     paths: {
       nodejs: '',
       python: '',
       git: '',
-      dataDirectory: ''
-    }
-  })
-  const theme = ref<Theme>('light')
-  const isDarkMode = computed(() => theme.value === 'dark')
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  const notifications = ref<Notification[]>([])
+      dataDirectory: '',
+    },
+  } as AppSettings);
+  const settings = ref<AppSettings>(defaultSettings.value);
+  const workspaces = ref<Workspace[]>([]);
 
+  // Getters
+  const themeClass = computed(() => settings.value.theme);
+  const fontSizeStyle = computed(() => `${settings.value.editor.fontSize}px`);
   // Actions
-  const setTheme = (newTheme: Theme) => {
-    theme.value = newTheme
-    settings.value.theme = newTheme
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
-    // Save to localStorage
-    localStorage.setItem('theme', newTheme)
-  }
+  async function initialize() {
+    isLoading.value = true;
+    error.value = null;
 
-  const toggleTheme = () => {
-    setTheme(theme.value === 'light' ? 'dark' : 'light')
-  }
-
-  const setWorkspace = (workspace: Workspace) => {
-    currentWorkspace.value = workspace
-    // Save to localStorage
-    localStorage.setItem('currentWorkspace', JSON.stringify(workspace))
-  }
-
-  const createWorkspace = (name: string, path: string): Workspace => {
-    const newWorkspace: Workspace = {
-      id: crypto.randomUUID(),
-      name,
-      path,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      settings: {}
-    }
-    workspaces.value.push(newWorkspace)
-    return newWorkspace
-  }
-
-  const deleteWorkspace = (workspaceId: string) => {
-    const index = workspaces.value.findIndex(w => w.id === workspaceId)
-    if (index !== -1) {
-      workspaces.value.splice(index, 1)
-      if (currentWorkspace.value?.id === workspaceId) {
-        currentWorkspace.value = workspaces.value[0] || null
-      }
-    }
-  }
-
-  const updateSettings = (newSettings: Partial<AppSettings>) => {
-    settings.value = { ...settings.value, ...newSettings }
-    // Save to localStorage
-    localStorage.setItem('appSettings', JSON.stringify(settings.value))
-  }
-
-  const updateEditorSettings = (editorSettings: Partial<EditorSettings>) => {
-    settings.value.editor = { ...settings.value.editor, ...editorSettings }
-    updateSettings({ editor: settings.value.editor })
-  }
-
-  const setLoading = (loading: boolean) => {
-    isLoading.value = loading
-  }
-
-  const setError = (message: string | null) => {
-    error.value = message
-  }
-
-  const addNotification = (notification: Omit<Notification, 'id' | 'timestamp'>) => {
-    const newNotification: Notification = {
-      ...notification,
-      id: crypto.randomUUID(),
-      timestamp: new Date().toISOString()
-    }
-    notifications.value.push(newNotification)
-
-    // Auto remove after 5 seconds
-    setTimeout(() => {
-      removeNotification(newNotification.id)
-    }, 5000)
-  }
-
-  const removeNotification = (notificationId: string) => {
-    const index = notifications.value.findIndex(n => n.id === notificationId)
-    if (index !== -1) {
-      notifications.value.splice(index, 1)
-    }
-  }
-
-  const clearNotifications = () => {
-    notifications.value = []
-  }
-
-  // Initialize
-  const initialize = () => {
-    // Load theme from localStorage
-    const savedTheme = localStorage.getItem('theme') as Theme
-    if (savedTheme) {
-      setTheme(savedTheme)
-    }
-
-    // Load settings from localStorage
-    const savedSettings = localStorage.getItem('appSettings')
-    if (savedSettings) {
+    try {
+      // Load settings from backend
       try {
-        settings.value = { ...settings.value, ...JSON.parse(savedSettings) }
-      } catch (e) {
-        console.error('Failed to parse saved settings:', e)
+        const backendSettings = await getSettings();
+        if (backendSettings) {
+          console.info('Loaded settings from backend:', backendSettings);
+          settings.value = {
+            ...settings.value,
+            ...backendSettings,
+          };
+        } else {
+          await saveSettings(JSON.stringify(settings.value));
+          console.warn('No settings received from backend, using defaults.');
+        }
+      } catch (err) {
+        console.warn('Failed to load settings from backend, using defaults:', err);
       }
-    }
 
-    // Load workspaces from localStorage
-    const savedWorkspaces = localStorage.getItem('workspaces')
-    if (savedWorkspaces) {
+      // Load workspaces
       try {
-        workspaces.value = JSON.parse(savedWorkspaces)
-      } catch (e) {
-        console.error('Failed to parse saved workspaces:', e)
+        const backendCurrentWorkspaceData = await getCurrentWorkspace();
+        currentWorkspace.value = {
+          ...currentWorkspace.value,
+          ...backendCurrentWorkspaceData,
+        };
+        const backendWorkspaceList = await getWorkspaces();
+        workspaces.value = backendWorkspaceList || [];
+      } catch (err) {
+        console.warn('Failed to load workspaces from backend:', err);
       }
-    }
-
-    // Load current workspace from localStorage
-    const savedCurrentWorkspace = localStorage.getItem('currentWorkspace')
-    if (savedCurrentWorkspace) {
-      try {
-        currentWorkspace.value = JSON.parse(savedCurrentWorkspace)
-      } catch (e) {
-        console.error('Failed to parse current workspace:', e)
-      }
+      isConnected.value = true;
+      saveToStorage();
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '初始化失败';
+      isConnected.value = false;
+      console.error('Failed to initialize app:', err);
+    } finally {
+      isLoading.value = false;
     }
   }
 
-  // Save state
-  const saveState = () => {
-    localStorage.setItem('workspaces', JSON.stringify(workspaces.value))
-    localStorage.setItem('currentWorkspace', JSON.stringify(currentWorkspace.value))
-    localStorage.setItem('appSettings', JSON.stringify(settings.value))
+  async function loadSettings() {
+    try {
+      const backendSettings = await invoke('get_settings');
+      if (backendSettings) {
+        settings.value = {
+          ...settings.value,
+          ...backendSettings,
+        };
+      }
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+    }
   }
 
-  // Reset to defaults
-  const resetToDefaults = () => {
-    settings.value = {
-      theme: 'light',
-      editor: {
-        fontSize: 14,
-        tabSize: 2,
-        wordWrap: 'off',
-        minimap: { enabled: true },
-        lineNumbers: 'on',
-        autoSave: true,
-        autoSaveDelay: 1000,
-        formatOnSave: true
-      },
-      terminal: {
-        fontSize: 14,
-        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-        cursorStyle: 'block',
-        cursorBlink: true
-      },
-      chat: {
-        autoScroll: true,
-        markdownPreview: true,
-        sendWithEnter: true
-      },
-      ai: {
-        defaultModel: 'claude-3-5-sonnet',
-        maxTokens: 4096,
-        temperature: 0.7,
-        topP: 0.9
-      },
-      paths: {
-        nodejs: '',
-        python: '',
-        git: '',
-        dataDirectory: ''
+  async function switchWorkspace(workspaceId: string) {
+    try {
+      const workspace: Workspace = await switchWorkspaceCommand(workspaceId);
+      const oldWorkspace:Workspace = workspaces.value.find((w) => w.id === currentWorkspace.value.id);
+      workspaces.value = workspaces.value.map((w) => {
+        if (w.id === oldWorkspace.value.id) {
+          return {
+            ...w,
+            isActive: false,
+          };
+        }
+        return w;
+      });
+      if (currentWorkspace.value.id !== workspaceId) {
+          currentWorkspace.value ={
+            ...currentWorkspace.value,
+            ...workspace,
+          }
       }
+      await saveSettings();
+    } catch (err) {
+      console.error('Failed to switch workspace:', err);
+      throw err;
     }
-    theme.value = 'light'
-    document.documentElement.classList.remove('dark')
-    saveState()
   }
+
+  async function createWorkspace(path: string,isActive:boolean) {
+    try {
+      // Generate a name for the workspace
+      let name = path.split('/').pop() || '';
+      if (name === path){
+        name = path.split('\\').pop() || '';
+      }
+      console.debug('Creating workspace with name:', name);
+      const newWorkspace: Workspace =await createWorkspaceCommand(name, path,isActive);
+      workspaces.value.push(newWorkspace);
+      currentWorkspace.value = newWorkspace;
+      saveToStorage();
+      return newWorkspace;
+    } catch (err) {
+      console.error('Failed to create workspace:', err);
+      throw err;
+    }
+  }
+
+  async function deleteWorkspace(workspaceId: string) {
+    try {
+      await deleteWorkspaceCommand(workspaceId);
+      workspaces.value = workspaces.value.filter((w) => w.id !== workspaceId);
+
+      if (currentWorkspace.value.id === workspaceId) {
+          currentWorkspace.value = {
+            ...currentWorkspace.value,
+          }
+      }
+      saveToStorage();
+    } catch (err) {
+      console.error('Failed to delete workspace:', err);
+      throw err;
+    }
+  }
+
+  function resetToDefaults() {
+    settings.value = defaultSettings.value;
+    saveToStorage();
+  }
+
+  const saveToStorage = () => {
+    localStorage.setItem('appSettings', JSON.stringify(settings.value));
+    localStorage.setItem('currentWorkspace', JSON.stringify(currentWorkspace.value));
+    localStorage.setItem('workspaces', JSON.stringify(workspaces.value));
+  };
+
+  const loadFromStorage = () => {
+    const storedSettings = localStorage.getItem('appSettings');
+    const storedCurrentWorkspace = localStorage.getItem('currentWorkspace');
+    const storedWorkspaces = localStorage.getItem('workspaces');
+    if (storedCurrentWorkspace) {
+      currentWorkspace.value = JSON.parse(storedCurrentWorkspace);
+    }
+    if (storedWorkspaces) {
+      workspaces.value = JSON.parse(storedWorkspaces);
+    }
+    if (storedSettings) {
+      settings.value = JSON.parse(storedSettings);
+    }
+  };
 
   return {
     // State
     currentWorkspace,
-    workspaces,
-    settings,
-    theme,
-    isDarkMode,
+    isConnected,
     isLoading,
     error,
-    notifications,
+    settings,
+    workspaces,
+
+    // Getters
+    themeClass,
+    fontSizeStyle,
 
     // Actions
-    setTheme,
-    toggleTheme,
-    setWorkspace,
+    initialize,
+    loadSettings,
+    saveSettings,
+    switchWorkspace,
     createWorkspace,
     deleteWorkspace,
-    updateSettings,
-    updateEditorSettings,
-    setLoading,
-    setError,
-    addNotification,
-    removeNotification,
-    clearNotifications,
-    initialize,
-    saveState,
-    resetToDefaults
-  }
-})
-
-// Types
-interface Notification {
-  id: string
-  type: 'success' | 'error' | 'warning' | 'info'
-  title: string
-  message: string
-  timestamp: string
-}
+  };
+});

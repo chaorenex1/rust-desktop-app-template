@@ -5,6 +5,7 @@
 pub mod config;
 pub mod core;
 pub mod database;
+pub mod migration;
 pub mod services;
 pub mod tauri;
 pub mod utils;

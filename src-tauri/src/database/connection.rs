@@ -3,12 +3,14 @@
 //! This module handles database connections and connection pooling.
 
 use std::sync::Arc;
-use tauri::{App, Manager};
+use tauri::{App, AppHandle, Manager, State};
 use tracing::{error, info};
 
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};
 use tokio::sync::Mutex;
 
+use crate::config::schema::AppConfig;
+use crate::migration;
 use crate::utils::error::{AppError, AppResult};
 
 /// Database connection pool wrapper
@@ -27,24 +29,21 @@ impl DatabasePool {
     }
 
     /// Get database connection
-    pub async fn get_connection(&self) -> AppResult<DatabaseConnection> {
+    pub async fn get_connection(&self, database_url: &str, max_connections: u32, min_connections: u32) -> AppResult<DatabaseConnection> {
         let mut conn = self.connection.lock().await;
 
         if conn.is_none() {
-            *conn = Some(Self::create_connection().await?);
+            *conn = Some(Self::create_connection(database_url, max_connections, min_connections).await?);
         }
 
         Ok(conn.as_ref().unwrap().clone())
     }
 
     /// Create a new database connection
-    async fn create_connection() -> AppResult<DatabaseConnection> {
-        // TODO: Load database URL from configuration
-        let database_url = "sqlite://data/app.db?mode=rwc";
-
+    async fn create_connection(database_url: &str, max_connections: u32, min_connections: u32) -> AppResult<DatabaseConnection> {
         let mut opt = ConnectOptions::new(database_url.to_string());
-        opt.max_connections(10)
-            .min_connections(1)
+        opt.max_connections(max_connections)
+            .min_connections(min_connections)
             .sqlx_logging(true)
             .sqlx_logging_level(tracing::log::LevelFilter::Info);
 
@@ -84,6 +83,35 @@ pub fn init(app: &mut App) -> AppResult<()> {
     let db_pool = DatabasePool::new();
     app.manage(db_pool);
 
+    // Run migrations in background
+    let app_handle = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        match get_db_connection(&app_handle).await {
+            Ok(db) => {
+                if let Err(e) = migration::run_migrations(&db).await {
+                    error!("Failed to run database migrations: {}", e);
+                } else {
+                    info!("Database migrations completed successfully");
+                }
+            }
+            Err(e) => {
+                error!("Failed to get database connection for migrations: {}", e);
+            }
+        }
+    });
+
     info!("Database initialized successfully");
     Ok(())
+}
+
+/// Get database connection from Tauri state with config
+pub async fn get_db_connection(app_handle: &AppHandle) -> AppResult<DatabaseConnection> {
+    let config = app_handle.state::<AppConfig>();
+    let db_pool = app_handle.state::<DatabasePool>();
+    
+    db_pool.get_connection(
+        &config.database.url,
+        config.database.max_connections,
+        config.database.min_connections
+    ).await
 }

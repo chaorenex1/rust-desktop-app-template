@@ -4,9 +4,10 @@
 
 use std::sync::{Arc, Mutex};
 use tauri::{App, AppHandle, Manager, State};
-use tracing::info;
 
 use crate::utils::error::AppResult;
+use crate::config::schema::AppConfig;
+use crate::services::terminal::TerminalService;
 
 /// Application state shared across the application
 #[derive(Debug)]
@@ -14,34 +15,35 @@ pub struct AppState {
     /// Application handle
     pub app_handle: AppHandle,
     /// Application configuration (wrapped in Mutex for modification)
-    pub config: Mutex<crate::config::loader::AppConfig>,
+    pub config: Mutex<AppConfig>,
     /// Database connection pool
     pub db_pool: Arc<crate::database::connection::DatabasePool>,
+    /// Terminal service for managing terminal sessions
+    pub terminal: TerminalService,
 }
 
 impl AppState {
     /// Create a new application state
     pub fn new(
         app_handle: AppHandle,
-        config: crate::config::loader::AppConfig,
+        config: AppConfig,
         db_pool: Arc<crate::database::connection::DatabasePool>,
     ) -> Self {
         Self {
             app_handle,
             config: Mutex::new(config),
             db_pool,
+            terminal: TerminalService::new(),
         }
     }
 }
 
 /// Initialize the application core
 pub fn init(app: &mut App) -> AppResult<()> {
-    info!("Initializing application core...");
-
     // Load application configuration
     let config = crate::config::loader::load_config()?;
-    info!("Configuration loaded successfully");
-
+    // initialize data directory
+    crate::utils::fs::init_dir(&config.app.data_dir)?;
     // Store configuration in Tauri state
     app.manage(config.clone());
 
@@ -55,7 +57,6 @@ pub fn init(app: &mut App) -> AppResult<()> {
     // Store application state in Tauri state
     app.manage(app_state);
 
-    info!("Application core initialized successfully");
     Ok(())
 }
 
@@ -70,7 +71,7 @@ pub fn get_app_handle(state: State<'_, AppState>) -> AppHandle {
 }
 
 /// Get application configuration from Tauri state
-pub fn get_config(state: State<'_, AppState>) -> crate::config::loader::AppConfig {
+pub fn get_config(state: State<'_, AppState>) -> AppConfig {
     state.inner().config.lock().unwrap().clone()
 }
 

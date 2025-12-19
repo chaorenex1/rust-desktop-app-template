@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   ElButton,
   ElCard,
@@ -12,11 +12,11 @@ import {
   ElOption,
   ElMessage,
   ElPageHeader,
-} from 'element-plus'
-import { useAppStore } from '../../stores/app'
+} from 'element-plus';
+import { useAppStore } from '../../stores/appStore';
 
-const router = useRouter()
-const appStore = useAppStore()
+const router = useRouter();
+const appStore = useAppStore();
 
 const settings = ref({
   theme: 'light',
@@ -25,28 +25,28 @@ const settings = ref({
   autoSave: true,
   aiModel: 'gpt-3.5-turbo',
   apiKey: '',
-})
+});
 
 const themes = [
   { label: '浅色', value: 'light' },
   { label: '深色', value: 'dark' },
   { label: '自动', value: 'auto' },
-]
+];
 
 const languages = [
   { label: '简体中文', value: 'zh-CN' },
   { label: 'English', value: 'en' },
-]
+];
 
 const aiModels = [
   { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo' },
   { label: 'GPT-4', value: 'gpt-4' },
   { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' },
-]
+];
 
 function handleSave() {
   // TODO: Implement save settings logic
-  ElMessage.success('设置已保存')
+  ElMessage.success('设置已保存');
 }
 
 function handleReset() {
@@ -58,12 +58,12 @@ function handleReset() {
     autoSave: true,
     aiModel: 'gpt-3.5-turbo',
     apiKey: '',
-  }
-  ElMessage.info('设置已重置为默认值')
+  };
+  ElMessage.info('设置已重置为默认值');
 }
 
 function goBack() {
-  router.back()
+  router.back();
 }
 </script>
 

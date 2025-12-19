@@ -3,124 +3,122 @@
 //! This module defines additional configuration schemas.
 
 use serde::{Deserialize, Serialize};
+use crate::config::loader::{get_default_data_dir, get_user_home};
 
-/// Environment variable configuration
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnvVar {
-    /// Variable name
+pub struct AppConfig {
+    /// Application settings
+    pub app: AppSettings,
+    /// Database settings
+    pub database: DatabaseSettings,
+    //// Deployment settings
+    pub deployment: DeploymentSettings,
+    /// Logging settings
+    pub logging: LoggingSettings,
+}
+
+/// Application settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
+    /// Application name
     pub name: String,
-    /// Variable value
-    pub value: String,
-    /// Is secret (should be masked in UI)
-    pub is_secret: bool,
-}
-
-/// AI Model configuration for settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModelConfig {
-    /// Model name
-    pub name: String,
-    /// API endpoint URL
-    pub endpoint: String,
-    /// API key (encrypted at rest)
-    pub api_key: String,
-    /// Is enabled
-    pub enabled: bool,
-}
-
-/// Code CLI configuration for settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CodeCliConfig {
-    /// CLI name
-    pub name: String,
-    /// Command path
-    pub path: String,
-    /// Default arguments
-    pub args: String,
-    /// Is enabled
-    pub enabled: bool,
-}
-
-/// Workspace configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceConfig {
-    /// Workspace ID
-    pub id: String,
-    /// Workspace name
-    pub name: String,
-    /// Workspace root path
-    pub path: String,
-    /// Created timestamp
-    pub created_at: String,
-    /// Updated timestamp
-    pub updated_at: String,
-    /// Associated environment variables
-    pub env_vars: Vec<EnvVar>,
-    /// Associated models
-    pub models: Vec<ModelConfig>,
-    /// Associated Code CLIs
-    pub code_clis: Vec<CodeCliConfig>,
-}
-
-impl Default for WorkspaceConfig {
-    fn default() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4().to_string(),
-            name: "default".to_string(),
-            path: ".".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            updated_at: chrono::Utc::now().to_rfc3339(),
-            env_vars: Vec::new(),
-            models: Vec::new(),
-            code_clis: Vec::new(),
-        }
-    }
-}
-
-/// Full settings configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SettingsConfig {
-    /// Application-wide settings
-    pub app: AppWideSettings,
-    /// List of workspaces
-    pub workspaces: Vec<WorkspaceConfig>,
-    /// Active workspace ID
-    pub active_workspace: String,
-}
-
-/// Application-wide settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppWideSettings {
-    /// Theme (light/dark)
-    pub theme: String,
-    /// Font size
-    pub font_size: u32,
-    /// Auto-save enabled
-    pub auto_save: bool,
-    /// Auto-save interval in seconds
-    pub auto_save_interval: u32,
-    /// Data directory path
+    /// Application version
+    pub version: String,
+    /// Data directory
     pub data_dir: String,
+    /// User Home directory
+    pub user_home: String,
+    /// Enable debug mode
+    /// Auto update enabled
+    pub auto_update: Option<bool>,
+}
+/// deployment settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeploymentSettings {
+    /// Deployment environment
+    pub environment: String,
+    /// DEBUG mode
+    pub debug: bool,
+    /// Host address
+    pub host: String,
+    /// Port number
+    pub port: u16,
 }
 
-impl Default for AppWideSettings {
-    fn default() -> Self {
-        Self {
-            theme: "light".to_string(),
-            font_size: 14,
-            auto_save: true,
-            auto_save_interval: 30,
-            data_dir: "data".to_string(),
-        }
-    }
+/// logging settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingSettings {
+    /// Log level
+    pub log_level: String,
+    /// Log fmt pattern
+    pub log_fmt_pattern: Option<String>,
+    /// Log file path
+    pub log_file_path: String,
+    /// Log file name
+    pub log_file_name: String,
+    /// Enable console logging
+    pub console: bool,
+    /// file_rotation settings
+    pub log_file_rotation: FileRotationSettings,
 }
 
-impl Default for SettingsConfig {
+/// File rotation settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileRotationSettings {
+    /// Maximum file size in MB
+    pub log_file_max_size_mb: u64,
+    /// Maximum number of backup files
+    pub log_file_max_backups: u32,
+    /// Maximum age of log files in days
+    pub log_file_max_age_days: u32,
+}
+
+/// Database settings
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DatabaseSettings {
+    /// Database URL
+    pub url: String,
+    /// Maximum connections
+    pub max_connections: u32,
+    /// Minimum connections
+    pub min_connections: u32,
+}
+
+impl Default for AppConfig {
     fn default() -> Self {
+        let data_dir = get_default_data_dir().unwrap();
         Self {
-            app: AppWideSettings::default(),
-            workspaces: vec![WorkspaceConfig::default()],
-            active_workspace: "default".to_string(),
+            app: AppSettings {
+                name: "Code AI Assistant".to_string(),
+                version: "0.1.0".to_string(),
+                data_dir: data_dir.clone(),
+                user_home: get_user_home().unwrap(),
+                auto_update: Some(true),
+            },
+            database: DatabaseSettings {
+                url: format!("sqlite://{}/app.db?mode=rwc", data_dir),
+                max_connections: 10,
+                min_connections: 1,
+            },
+            deployment: DeploymentSettings {
+                environment: "development".to_string(),
+                debug: true,
+                host: "127.0.0.1".to_string(),
+                port: 8080,
+            },
+            logging: LoggingSettings {
+                log_level: "debug".to_string(),
+                log_file_path: get_default_data_dir().unwrap() + "/logs",
+                log_file_name: "app.log".to_string(),
+                log_fmt_pattern: Some("%Y-%m-%d %H:%M:%S%.3f %l %T %n %f:%L".to_string()),
+                console: true,
+                log_file_rotation: FileRotationSettings {
+                    log_file_max_size_mb: 10,
+                    log_file_max_backups: 5,
+                    log_file_max_age_days: 30,
+                },
+            },
         }
     }
 }

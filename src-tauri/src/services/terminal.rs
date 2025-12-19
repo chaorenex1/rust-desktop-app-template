@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::utils::error::{AppError, AppResult};
 
 /// Terminal session
+#[derive(Debug)]
 pub struct TerminalSession {
     /// Session ID
     pub id: String,
@@ -44,25 +45,17 @@ impl TerminalSession {
 }
 
 /// Terminal Service for managing terminal sessions
+#[derive(Debug)]
 pub struct TerminalService {
     /// Active terminal sessions
     sessions: Arc<Mutex<HashMap<String, TerminalSession>>>,
-    /// Default shell command
-    default_shell: String,
 }
 
 impl TerminalService {
     /// Create a new terminal service
     pub fn new() -> Self {
-        let default_shell = if cfg!(target_os = "windows") {
-            "powershell.exe".to_string()
-        } else {
-            "bash".to_string()
-        };
-
         Self {
             sessions: Arc::new(Mutex::new(HashMap::new())),
-            default_shell,
         }
     }
 
@@ -102,20 +95,77 @@ impl TerminalService {
     pub fn execute_command(
         &self,
         session_id: &str,
-        command: &str,
-        args: &[String],
+        shell: &str,
+        command_line: &str,
     ) -> AppResult<String> {
-        let sessions = self.sessions.lock().map_err(|e| {
-            AppError::ProcessError(format!("Failed to lock sessions: {}", e))
-        })?;
+        // 先在短时间内获取会话工作目录，然后释放锁，避免长时间持有锁阻塞并行执行
+        let cwd = {
+            let sessions = self.sessions.lock().map_err(|e| {
+                AppError::ProcessError(format!("Failed to lock sessions: {}", e))
+            })?;
 
-        let session = sessions.get(session_id).ok_or_else(|| {
-            AppError::ProcessError(format!("Session not found: {}", session_id))
-        })?;
+            let session = sessions.get(session_id).ok_or_else(|| {
+                AppError::ProcessError(format!("Session not found: {}", session_id))
+            })?;
 
-        let output = Command::new(command)
-            .args(args)
-            .current_dir(&session.cwd)
+            session.cwd.clone()
+        };
+
+        // 根据前端选择的 shell 校验并构造具体命令
+        #[cfg(target_os = "windows")]
+        let mut cmd = {
+            let shell_norm = shell.trim().to_lowercase();
+
+            if shell_norm.starts_with("powershell") || shell_norm == "pwsh" {
+                let mut c = Command::new("powershell.exe");
+                c.arg("-NoLogo")
+                    .arg("-NoProfile")
+                    .arg("-Command")
+                    .arg(command_line);
+                c
+            } else if shell_norm == "cmd" || shell_norm == "cmd.exe" {
+                let mut c = Command::new("cmd.exe");
+                c.arg("/C").arg(command_line);
+                c
+            } else {
+                return Err(AppError::ProcessError(format!(
+                    "Unsupported shell on Windows: {}",
+                    shell
+                )));
+            }
+        };
+
+        #[cfg(not(target_os = "windows"))]
+        let mut cmd = {
+            let shell_norm = shell.trim().to_lowercase();
+
+            if shell_norm == "bash" {
+                let mut c = Command::new("bash");
+                c.arg("-lc").arg(command_line);
+                c
+            } else if shell_norm == "zsh" {
+                let mut c = Command::new("zsh");
+                c.arg("-lc").arg(command_line);
+                c
+            } else if shell_norm == "sh" {
+                let mut c = Command::new("sh");
+                c.arg("-lc").arg(command_line);
+                c
+            } else {
+                return Err(AppError::ProcessError(format!(
+                    "Unsupported shell on Unix-like system: {}",
+                    shell
+                )));
+            }
+        };
+
+        info!(
+            "Executing terminal command in session {} with shell '{}': {}",
+            session_id, shell, command_line
+        );
+
+        let output = cmd
+            .current_dir(&cwd)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .output()
@@ -142,11 +192,6 @@ impl TerminalService {
             .lock()
             .map(|s| s.keys().cloned().collect())
             .unwrap_or_default()
-    }
-
-    /// Set default shell
-    pub fn set_default_shell(&mut self, shell: String) {
-        self.default_shell = shell;
     }
 }
 

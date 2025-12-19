@@ -1,8 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router'
-import Home from '../pages/Home/index.vue'
-import Dashboard from '../pages/Dashboard/index.vue'
-import Login from '../pages/Login/index.vue'
-import Settings from '../pages/Settings/index.vue'
+import { createRouter, createWebHistory } from 'vue-router';
+import Home from '../pages/Home/index.vue';
+import Dashboard from '../pages/Dashboard/index.vue';
+import Login from '../pages/Login/index.vue';
+import Settings from '../pages/Settings/index.vue';
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -46,22 +46,22 @@ const router = createRouter({
       redirect: '/',
     },
   ],
-})
+});
 
 // Navigation guard for route title
 router.beforeEach((to, from, next) => {
   // Set page title
   if (to.meta.title) {
-    document.title = `${to.meta.title} - Code AI Assistant`
+    document.title = `${to.meta.title} - Code AI Assistant`;
   }
-  
+
   // Check authentication (if needed)
   // if (to.meta.requiresAuth) {
   //   // Check if user is authenticated
   //   // If not, redirect to login
   // }
-  
-  next()
-})
 
-export default router
+  next();
+});
+
+export default router;

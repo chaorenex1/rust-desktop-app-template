@@ -1,44 +1,52 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { Folder, Document, Plus, Refresh, Search } from '@element-plus/icons-vue'
-import { ElTree, ElInput, ElButton, ElIcon, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus'
-import { useFileStore } from '../../stores/modules/files'
+import { ref, onMounted } from 'vue';
+import { Folder, Document, Plus, Refresh, Search } from '@element-plus/icons-vue';
+import {
+  ElTree,
+  ElInput,
+  ElButton,
+  ElIcon,
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem,
+} from 'element-plus';
+import { useFileStore } from '../../stores/filesStore';
 
-const fileStore = useFileStore()
-const searchQuery = ref('')
+const fileStore = useFileStore();
+const searchQuery = ref('');
 
 // Load directory on mount
 onMounted(() => {
-  fileStore.loadDirectory()
-})
+  fileStore.loadDirectory();
+});
 
 // Handle node click
 function handleNodeClick(data: any) {
   if (data.isDirectory) {
-    fileStore.loadDirectory(data.path)
+    fileStore.loadDirectory(data.path);
   } else {
-    fileStore.openFile(data.path)
+    fileStore.openFile(data.path);
   }
 }
 
 // Handle context menu
 function handleContextMenu(event: MouseEvent, node: any) {
-  event.preventDefault()
+  event.preventDefault();
   // TODO: Implement context menu
-  console.log('Context menu:', node)
+  console.log('Context menu:', node);
 }
 
 // Create new file/folder
 async function createNew(isDirectory = false) {
-  const name = prompt(`请输入${isDirectory ? '文件夹' : '文件'}名称:`)
+  const name = prompt(`请输入${isDirectory ? '文件夹' : '文件'}名称:`);
   if (name) {
-    await fileStore.createFile(name, isDirectory)
+    await fileStore.createFile(name, isDirectory);
   }
 }
 
 // Refresh directory
 function refreshDirectory() {
-  fileStore.loadDirectory(fileStore.currentDirectory)
+  fileStore.loadDirectory(fileStore.currentDirectory);
 }
 </script>
 
@@ -48,12 +56,8 @@ function refreshDirectory() {
     <div class="border-b border-border bg-surface p-2">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center space-x-1">
-          <ElButton :icon="Plus" size="small" text @click="createNew(false)">
-            文件
-          </ElButton>
-          <ElButton :icon="Folder" size="small" text @click="createNew(true)">
-            文件夹
-          </ElButton>
+          <ElButton :icon="Plus" size="small" text @click="createNew(false)"> 文件 </ElButton>
+          <ElButton :icon="Folder" size="small" text @click="createNew(true)"> 文件夹 </ElButton>
         </div>
         <ElButton :icon="Refresh" size="small" text @click="refreshDirectory" />
       </div>
@@ -70,7 +74,9 @@ function refreshDirectory() {
     <!-- File Tree -->
     <div class="flex-1 overflow-auto p-2">
       <div v-if="fileStore.isLoading" class="flex-col-center h-full">
-        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+        <div
+          class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"
+        ></div>
         <p class="mt-2 text-sm text-text-secondary">加载中...</p>
       </div>
 
@@ -84,7 +90,7 @@ function refreshDirectory() {
 
       <div v-else class="space-y-1">
         <div
-          v-for="file in fileStore.files.filter(f =>
+          v-for="file in fileStore.files.filter((f) =>
             searchQuery ? f.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
           )"
           :key="file.path"
@@ -109,7 +115,9 @@ function refreshDirectory() {
                   <ElDropdownItem command="rename">重命名</ElDropdownItem>
                   <ElDropdownItem command="delete" divided>删除</ElDropdownItem>
                   <ElDropdownItem command="copy_path">复制路径</ElDropdownItem>
-                  <ElDropdownItem command="open_terminal" v-if="file.isDirectory">在终端打开</ElDropdownItem>
+                  <ElDropdownItem command="open_terminal" v-if="file.isDirectory"
+                    >在终端打开</ElDropdownItem
+                  >
                 </ElDropdownMenu>
               </template>
             </ElDropdown>
@@ -129,13 +137,13 @@ function refreshDirectory() {
 
 <script lang="ts">
 // Separate script block for component registration
-import { More } from '@element-plus/icons-vue'
+import { More } from '@element-plus/icons-vue';
 
 export default {
   components: {
     More,
   },
-}
+};
 </script>
 
 <style scoped>

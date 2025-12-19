@@ -1,56 +1,67 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Folder, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue'
-import { ElForm, ElFormItem, ElInput, ElSelect, ElOption, ElButton, ElSwitch, ElTable, ElTableColumn, ElDialog } from 'element-plus'
-import { useAppStore } from '../../stores/app'
+import { ref } from 'vue';
+import { Folder, Refresh, Plus, Delete, Edit } from '@element-plus/icons-vue';
+import {
+  ElForm,
+  ElFormItem,
+  ElInput,
+  ElSelect,
+  ElOption,
+  ElButton,
+  ElSwitch,
+  ElTable,
+  ElTableColumn,
+  ElDialog,
+} from 'element-plus';
+import { useAppStore } from '../../stores/appStore';
 
-const appStore = useAppStore()
+const appStore = useAppStore();
 
 // Workspace settings
-const workspaceName = ref('')
-const dataDirectory = ref('~/.code-ai-assistant')
+const workspaceName = ref('');
+const dataDirectory = ref('~/.code-ai-assistant');
 
 // CLI tool paths
 const cliPaths = ref({
   nodejs: '/usr/bin/node',
   python: '/usr/bin/python3',
   git: '/usr/bin/git',
-})
+});
 
 // Environment variables
 const envVars = ref([
   { name: 'API_KEY', value: 'sk-...****************', isSecret: true },
   { name: 'PATH', value: '/usr/local/bin:/usr/bin:/bin', isSecret: false },
-])
+]);
 
-const newEnvVar = ref({ name: '', value: '', isSecret: false })
-const showEnvVarDialog = ref(false)
+const newEnvVar = ref({ name: '', value: '', isSecret: false });
+const showEnvVarDialog = ref(false);
 
 // AI models
 const aiModels = ref([
   { name: 'Claude-3.5-Sonnet', endpoint: 'api.anthropic.com/v1', apiKey: '********' },
   { name: 'GPT-4', endpoint: 'api.openai.com/v1', apiKey: '********' },
-])
+]);
 
-const newAiModel = ref({ name: '', endpoint: '', apiKey: '' })
-const showAiModelDialog = ref(false)
+const newAiModel = ref({ name: '', endpoint: '', apiKey: '' });
+const showAiModelDialog = ref(false);
 
 // Code CLIs
 const codeClis = ref([
   { name: 'OpenAI-Codex', command: '/usr/bin/codex', args: '--model gpt-4' },
   { name: 'Local-Coder', command: '/usr/local/bin/coder', args: '--local' },
-])
+]);
 
-const newCodeCli = ref({ name: '', command: '', args: '' })
-const showCodeCliDialog = ref(false)
+const newCodeCli = ref({ name: '', command: '', args: '' });
+const showCodeCliDialog = ref(false);
 
 // Save settings
 async function saveSettings() {
   try {
-    await appStore.saveSettings()
+    await appStore.saveSettings();
     // TODO: Save other settings
   } catch (error) {
-    console.error('Failed to save settings:', error)
+    console.error('Failed to save settings:', error);
   }
 }
 
@@ -59,13 +70,13 @@ async function resetSettings() {
   if (confirm('确定要重置所有设置为默认值吗？')) {
     try {
       // Reset to default settings
-      appStore.settings.theme = 'light'
-      appStore.settings.fontSize = 14
-      appStore.settings.autoSave = true
-      await appStore.saveSettings()
+      appStore.settings.theme = 'light';
+      appStore.settings.fontSize = 14;
+      appStore.settings.autoSave = true;
+      await appStore.saveSettings();
       // TODO: Reset other settings
     } catch (error) {
-      console.error('Failed to reset settings:', error)
+      console.error('Failed to reset settings:', error);
     }
   }
 }
@@ -74,10 +85,10 @@ async function resetSettings() {
 async function createWorkspace() {
   if (workspaceName.value.trim()) {
     try {
-      await appStore.createWorkspace(workspaceName.value.trim())
-      workspaceName.value = ''
+      await appStore.createWorkspace(workspaceName.value.trim());
+      workspaceName.value = '';
     } catch (error) {
-      console.error('Failed to create workspace:', error)
+      console.error('Failed to create workspace:', error);
     }
   }
 }
@@ -85,9 +96,9 @@ async function createWorkspace() {
 async function deleteWorkspace(name: string) {
   if (confirm(`确定要删除工作区 "${name}" 吗？`)) {
     try {
-      await appStore.deleteWorkspace(name)
+      await appStore.deleteWorkspace(name);
     } catch (error) {
-      console.error('Failed to delete workspace:', error)
+      console.error('Failed to delete workspace:', error);
     }
   }
 }
@@ -95,46 +106,46 @@ async function deleteWorkspace(name: string) {
 // Environment variable operations
 function addEnvVar() {
   if (newEnvVar.value.name.trim() && newEnvVar.value.value.trim()) {
-    envVars.value.push({ ...newEnvVar.value })
-    newEnvVar.value = { name: '', value: '', isSecret: false }
-    showEnvVarDialog.value = false
+    envVars.value.push({ ...newEnvVar.value });
+    newEnvVar.value = { name: '', value: '', isSecret: false };
+    showEnvVarDialog.value = false;
   }
 }
 
 function removeEnvVar(index: number) {
-  envVars.value.splice(index, 1)
+  envVars.value.splice(index, 1);
 }
 
 // AI model operations
 function addAiModel() {
   if (newAiModel.value.name.trim() && newAiModel.value.endpoint.trim()) {
-    aiModels.value.push({ ...newAiModel.value, apiKey: '********' })
-    newAiModel.value = { name: '', endpoint: '', apiKey: '' }
-    showAiModelDialog.value = false
+    aiModels.value.push({ ...newAiModel.value, apiKey: '********' });
+    newAiModel.value = { name: '', endpoint: '', apiKey: '' };
+    showAiModelDialog.value = false;
   }
 }
 
 function removeAiModel(index: number) {
-  aiModels.value.splice(index, 1)
+  aiModels.value.splice(index, 1);
 }
 
 // Code CLI operations
 function addCodeCli() {
   if (newCodeCli.value.name.trim() && newCodeCli.value.command.trim()) {
-    codeClis.value.push({ ...newCodeCli.value })
-    newCodeCli.value = { name: '', command: '', args: '' }
-    showCodeCliDialog.value = false
+    codeClis.value.push({ ...newCodeCli.value });
+    newCodeCli.value = { name: '', command: '', args: '' };
+    showCodeCliDialog.value = false;
   }
 }
 
 function removeCodeCli(index: number) {
-  codeClis.value.splice(index, 1)
+  codeClis.value.splice(index, 1);
 }
 
 // Browse directory
 function browseDirectory() {
   // TODO: Implement directory browser
-  console.log('Browse directory')
+  console.log('Browse directory');
 }
 </script>
 
@@ -156,15 +167,9 @@ function browseDirectory() {
               />
             </ElSelect>
 
-            <ElInput
-              v-model="workspaceName"
-              placeholder="新工作区名称"
-              style="width: 200px"
-            />
+            <ElInput v-model="workspaceName" placeholder="新工作区名称" style="width: 200px" />
 
-            <ElButton type="primary" :icon="Plus" @click="createWorkspace">
-              新建
-            </ElButton>
+            <ElButton type="primary" :icon="Plus" @click="createWorkspace"> 新建 </ElButton>
 
             <ElButton
               v-if="appStore.currentWorkspace !== 'default'"
@@ -180,12 +185,8 @@ function browseDirectory() {
         <ElFormItem label="应用数据目录">
           <div class="flex items-center space-x-2">
             <ElInput v-model="dataDirectory" readonly style="width: 300px" />
-            <ElButton :icon="Folder" @click="browseDirectory">
-              浏览...
-            </ElButton>
-            <ElButton :icon="Refresh">
-              重置为默认
-            </ElButton>
+            <ElButton :icon="Folder" @click="browseDirectory"> 浏览... </ElButton>
+            <ElButton :icon="Refresh"> 重置为默认 </ElButton>
           </div>
         </ElFormItem>
       </ElForm>
@@ -199,27 +200,21 @@ function browseDirectory() {
         <ElFormItem label="Node.js">
           <div class="flex items-center space-x-2">
             <ElInput v-model="cliPaths.nodejs" style="width: 300px" />
-            <ElButton :icon="Folder" @click="browseDirectory">
-              浏览...
-            </ElButton>
+            <ElButton :icon="Folder" @click="browseDirectory"> 浏览... </ElButton>
           </div>
         </ElFormItem>
 
         <ElFormItem label="Python">
           <div class="flex items-center space-x-2">
             <ElInput v-model="cliPaths.python" style="width: 300px" />
-            <ElButton :icon="Folder" @click="browseDirectory">
-              浏览...
-            </ElButton>
+            <ElButton :icon="Folder" @click="browseDirectory"> 浏览... </ElButton>
           </div>
         </ElFormItem>
 
         <ElFormItem label="Git">
           <div class="flex items-center space-x-2">
             <ElInput v-model="cliPaths.git" style="width: 300px" />
-            <ElButton :icon="Folder" @click="browseDirectory">
-              浏览...
-            </ElButton>
+            <ElButton :icon="Folder" @click="browseDirectory"> 浏览... </ElButton>
           </div>
         </ElFormItem>
       </ElForm>
@@ -319,12 +314,8 @@ function browseDirectory() {
 
     <!-- Action Buttons -->
     <div class="flex items-center justify-end space-x-4">
-      <ElButton @click="resetSettings">
-        恢复默认
-      </ElButton>
-      <ElButton type="primary" @click="saveSettings">
-        保存设置
-      </ElButton>
+      <ElButton @click="resetSettings"> 恢复默认 </ElButton>
+      <ElButton type="primary" @click="saveSettings"> 保存设置 </ElButton>
     </div>
 
     <!-- Dialogs -->

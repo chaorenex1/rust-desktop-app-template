@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Code AI Assistant",
   "version": "0.1.0",
-  "identifier": "com.aduib.codeai.assistant",
+  "identifier": "codeai-assistant",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:5173",
@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Code AI Assistant",
-        "width": 1200,
-        "height": 800,
-        "minWidth": 800,
-        "minHeight": 600,
+        "width": 1920,
+        "height": 1080,
+        "minWidth": 1600,
+        "minHeight": 900,
         "resizable": true,
         "fullscreen": false,
         "alwaysOnTop": false,
@@ -30,8 +30,15 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' data:; object-src 'none'; frame-src 'none'; worker-src 'self' blob:;",
-      "capabilities": ["default"]
+      "csp": null,
+      "capabilities": ["default"],
+      "assetProtocol": {
+        "enable": true,
+        "scope": {
+          "allow": ["**"],
+          "requireLiteralLeadingDot": false
+        }
+      }
     }
   },
   "bundle": {

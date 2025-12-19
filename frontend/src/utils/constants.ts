@@ -1,70 +1,127 @@
 // Application constants
-export const APP_NAME = 'Code AI Assistant'
-export const APP_VERSION = '0.1.0'
-export const APP_DESCRIPTION = 'A desktop application with code editor, AI chat assistant, CLI output and terminal functionality'
+export const APP_NAME = 'Code AI Assistant';
+export const APP_VERSION = '0.1.0';
+export const APP_DESCRIPTION =
+  'A desktop application with code editor, AI chat assistant, CLI output and terminal functionality';
 
 // File system constants
-export const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export const SUPPORTED_FILE_EXTENSIONS = [
   // Programming languages
-  '.js', '.ts', '.jsx', '.tsx', '.py', '.java', '.cpp', '.c', '.cs', '.go', '.rs', '.rb', '.php',
-  '.swift', '.kt', '.scala', '.pl', '.lua', '.r', '.sh', '.bash', '.zsh', '.fish',
+  '.js',
+  '.ts',
+  '.jsx',
+  '.tsx',
+  '.py',
+  '.java',
+  '.cpp',
+  '.c',
+  '.cs',
+  '.go',
+  '.rs',
+  '.rb',
+  '.php',
+  '.swift',
+  '.kt',
+  '.scala',
+  '.pl',
+  '.lua',
+  '.r',
+  '.sh',
+  '.bash',
+  '.zsh',
+  '.fish',
 
   // Web technologies
-  '.html', '.htm', '.css', '.scss', '.sass', '.less', '.json', '.xml', '.yaml', '.yml', '.toml',
-  '.md', '.markdown',
+  '.html',
+  '.htm',
+  '.css',
+  '.scss',
+  '.sass',
+  '.less',
+  '.json',
+  '.xml',
+  '.yaml',
+  '.yml',
+  '.toml',
+  '.md',
+  '.markdown',
 
   // Data formats
-  '.csv', '.tsv', '.sql', '.db', '.sqlite',
+  '.csv',
+  '.tsv',
+  '.sql',
+  '.db',
+  '.sqlite',
 
   // Configuration
-  '.env', '.config', '.conf', '.ini',
+  '.env',
+  '.config',
+  '.conf',
+  '.ini',
 
   // Documents
-  '.txt', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.txt',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
 
   // Images
-  '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', '.bmp',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.svg',
+  '.ico',
+  '.bmp',
 
   // Archives
-  '.zip', '.tar', '.gz', '.7z', '.rar'
-]
+  '.zip',
+  '.tar',
+  '.gz',
+  '.7z',
+  '.rar',
+];
 
-export const DEFAULT_FILE_ENCODING = 'utf-8'
-export const AUTO_SAVE_INTERVAL = 5000 // 5 seconds
+export const DEFAULT_FILE_ENCODING = 'utf-8';
+export const AUTO_SAVE_INTERVAL = 5000; // 5 seconds
 
 // Editor constants
-export const EDITOR_DEFAULT_FONT_SIZE = 14
-export const EDITOR_MIN_FONT_SIZE = 8
-export const EDITOR_MAX_FONT_SIZE = 32
-export const EDITOR_DEFAULT_TAB_SIZE = 2
-export const EDITOR_MIN_TAB_SIZE = 1
-export const EDITOR_MAX_TAB_SIZE = 8
-export const EDITOR_DEFAULT_WORD_WRAP = 'off'
-export const EDITOR_DEFAULT_LINE_NUMBERS = 'on'
+export const EDITOR_DEFAULT_FONT_SIZE = 14;
+export const EDITOR_MIN_FONT_SIZE = 8;
+export const EDITOR_MAX_FONT_SIZE = 32;
+export const EDITOR_DEFAULT_TAB_SIZE = 2;
+export const EDITOR_MIN_TAB_SIZE = 1;
+export const EDITOR_MAX_TAB_SIZE = 8;
+export const EDITOR_DEFAULT_WORD_WRAP = 'off';
+export const EDITOR_DEFAULT_LINE_NUMBERS = 'on';
 
 // Terminal constants
-export const TERMINAL_DEFAULT_FONT_SIZE = 14
-export const TERMINAL_MIN_FONT_SIZE = 8
-export const TERMINAL_MAX_FONT_SIZE = 32
-export const TERMINAL_DEFAULT_FONT_FAMILY = 'Consolas, Monaco, "Courier New", monospace'
-export const TERMINAL_DEFAULT_CURSOR_STYLE = 'block'
-export const TERMINAL_DEFAULT_CURSOR_BLINK = true
-export const TERMINAL_MAX_HISTORY_LINES = 10000
-export const TERMINAL_MAX_SESSIONS = 10
+export const TERMINAL_DEFAULT_FONT_SIZE = 14;
+export const TERMINAL_MIN_FONT_SIZE = 8;
+export const TERMINAL_MAX_FONT_SIZE = 32;
+export const TERMINAL_DEFAULT_FONT_FAMILY = 'Consolas, Monaco, "Courier New", monospace';
+export const TERMINAL_DEFAULT_CURSOR_STYLE = 'block';
+export const TERMINAL_DEFAULT_CURSOR_BLINK = true;
+export const TERMINAL_MAX_HISTORY_LINES = 10000;
+export const TERMINAL_MAX_SESSIONS = 10;
 
 // AI constants
-export const AI_DEFAULT_MODEL = 'claude-3-5-sonnet'
-export const AI_MAX_TOKENS = 4096
-export const AI_MIN_TOKENS = 1
-export const AI_MAX_TOKENS_LIMIT = 16384
-export const AI_DEFAULT_TEMPERATURE = 0.7
-export const AI_MIN_TEMPERATURE = 0.0
-export const AI_MAX_TEMPERATURE = 2.0
-export const AI_DEFAULT_TOP_P = 0.9
-export const AI_MIN_TOP_P = 0.0
-export const AI_MAX_TOP_P = 1.0
-export const AI_MAX_CONTEXT_LENGTH = 128000
+export const AI_DEFAULT_MODEL = 'claude-3-5-sonnet';
+export const AI_MAX_TOKENS = 4096;
+export const AI_MIN_TOKENS = 1;
+export const AI_MAX_TOKENS_LIMIT = 16384;
+export const AI_DEFAULT_TEMPERATURE = 0.7;
+export const AI_MIN_TEMPERATURE = 0.0;
+export const AI_MAX_TEMPERATURE = 2.0;
+export const AI_DEFAULT_TOP_P = 0.9;
+export const AI_MIN_TOP_P = 0.0;
+export const AI_MAX_TOP_P = 1.0;
+export const AI_MAX_CONTEXT_LENGTH = 128000;
 
 export const AI_MODELS = [
   {
@@ -75,7 +132,7 @@ export const AI_MODELS = [
     maxTokens: 4096,
     temperature: 0.7,
     topP: 0.9,
-    enabled: true
+    enabled: true,
   },
   {
     id: 'gpt-4',
@@ -85,7 +142,7 @@ export const AI_MODELS = [
     maxTokens: 8192,
     temperature: 0.7,
     topP: 0.9,
-    enabled: true
+    enabled: true,
   },
   {
     id: 'gemini-pro',
@@ -95,22 +152,22 @@ export const AI_MODELS = [
     maxTokens: 2048,
     temperature: 0.7,
     topP: 0.9,
-    enabled: true
-  }
-]
+    enabled: true,
+  },
+];
 
 // Chat constants
-export const CHAT_MAX_MESSAGE_LENGTH = 10000
-export const CHAT_MAX_FILES_PER_MESSAGE = 10
-export const CHAT_HISTORY_LIMIT = 100
-export const CHAT_AUTO_SCROLL_THRESHOLD = 100
-export const CHAT_TYPING_INDICATOR_DELAY = 1000 // 1 second
+export const CHAT_MAX_MESSAGE_LENGTH = 10000;
+export const CHAT_MAX_FILES_PER_MESSAGE = 10;
+export const CHAT_HISTORY_LIMIT = 100;
+export const CHAT_AUTO_SCROLL_THRESHOLD = 100;
+export const CHAT_TYPING_INDICATOR_DELAY = 1000; // 1 second
 
 // Workspace constants
-export const WORKSPACE_MAX_NAME_LENGTH = 100
-export const WORKSPACE_MIN_NAME_LENGTH = 1
-export const WORKSPACE_MAX_PATH_LENGTH = 500
-export const WORKSPACE_MAX_COUNT = 50
+export const WORKSPACE_MAX_NAME_LENGTH = 100;
+export const WORKSPACE_MIN_NAME_LENGTH = 1;
+export const WORKSPACE_MAX_PATH_LENGTH = 500;
+export const WORKSPACE_MAX_COUNT = 50;
 export const WORKSPACE_DEFAULT_SETTINGS = {
   theme: 'light',
   editor: {
@@ -118,28 +175,28 @@ export const WORKSPACE_DEFAULT_SETTINGS = {
     tabSize: 2,
     wordWrap: 'off',
     minimap: { enabled: true },
-    lineNumbers: 'on'
+    lineNumbers: 'on',
   },
   terminal: {
     fontSize: 14,
     fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-    cursorStyle: 'block'
-  }
-}
+    cursorStyle: 'block',
+  },
+};
 
 // Settings constants
-export const SETTINGS_STORAGE_KEY = 'app_settings'
-export const SETTINGS_DEFAULT_THEME = 'light'
-export const SETTINGS_DEFAULT_LANGUAGE = 'en'
-export const SETTINGS_DEFAULT_AUTO_SAVE = true
-export const SETTINGS_DEFAULT_AUTO_SAVE_DELAY = 1000
-export const SETTINGS_DEFAULT_FORMAT_ON_SAVE = true
+export const SETTINGS_STORAGE_KEY = 'app_settings';
+export const SETTINGS_DEFAULT_THEME = 'light';
+export const SETTINGS_DEFAULT_LANGUAGE = 'en';
+export const SETTINGS_DEFAULT_AUTO_SAVE = true;
+export const SETTINGS_DEFAULT_AUTO_SAVE_DELAY = 1000;
+export const SETTINGS_DEFAULT_FORMAT_ON_SAVE = true;
 
 // Path constants
-export const DEFAULT_DATA_DIRECTORY = '.code-ai-assistant'
-export const DEFAULT_CONFIG_FILE = 'config.json'
-export const DEFAULT_LOG_FILE = 'app.log'
-export const DEFAULT_DATABASE_FILE = 'database.sqlite'
+export const DEFAULT_DATA_DIRECTORY = '.code-ai-assistant';
+export const DEFAULT_CONFIG_FILE = 'config.json';
+export const DEFAULT_LOG_FILE = 'app.log';
+export const DEFAULT_DATABASE_FILE = 'database.sqlite';
 
 // Keyboard shortcuts
 export const KEYBOARD_SHORTCUTS = {
@@ -168,8 +225,8 @@ export const KEYBOARD_SHORTCUTS = {
   RESET_FONT_SIZE: 'Ctrl+0',
   ZOOM_IN: 'Ctrl+Shift+=',
   ZOOM_OUT: 'Ctrl+Shift+-',
-  RESET_ZOOM: 'Ctrl+Shift+0'
-}
+  RESET_ZOOM: 'Ctrl+Shift+0',
+};
 
 // Event constants
 export const EVENT_TYPES = {
@@ -189,8 +246,8 @@ export const EVENT_TYPES = {
   APP_ERROR: 'app:error',
   APP_WARNING: 'app:warning',
   APP_INFO: 'app:info',
-  APP_STATUS: 'app:status'
-}
+  APP_STATUS: 'app:status',
+};
 
 // Error messages
 export const ERROR_MESSAGES = {
@@ -218,8 +275,8 @@ export const ERROR_MESSAGES = {
   NETWORK_ERROR: 'Network error',
   PERMISSION_ERROR: 'Permission denied',
   VALIDATION_ERROR: 'Validation error',
-  UNKNOWN_ERROR: 'An unknown error occurred'
-}
+  UNKNOWN_ERROR: 'An unknown error occurred',
+};
 
 // Success messages
 export const SUCCESS_MESSAGES = {
@@ -235,8 +292,8 @@ export const SUCCESS_MESSAGES = {
   SETTINGS_RESET: 'Settings reset to defaults',
   WORKSPACE_CREATED: 'Workspace created successfully',
   WORKSPACE_SWITCHED: 'Workspace switched successfully',
-  WORKSPACE_DELETED: 'Workspace deleted successfully'
-}
+  WORKSPACE_DELETED: 'Workspace deleted successfully',
+};
 
 // Validation patterns
 export const VALIDATION_PATTERNS = {
@@ -245,8 +302,8 @@ export const VALIDATION_PATTERNS = {
   FILENAME: /^[^\\/:*?"<>|]+$/,
   PATH: /^[^\\:*?"<>|]+$/,
   HEX_COLOR: /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/,
-  UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-}
+  UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+};
 
 // Time constants
 export const TIME = {
@@ -256,8 +313,8 @@ export const TIME = {
   DAY: 24 * 60 * 60 * 1000,
   WEEK: 7 * 24 * 60 * 60 * 1000,
   MONTH: 30 * 24 * 60 * 60 * 1000,
-  YEAR: 365 * 24 * 60 * 60 * 1000
-}
+  YEAR: 365 * 24 * 60 * 60 * 1000,
+};
 
 // UI constants
 export const UI = {
@@ -278,9 +335,9 @@ export const UI = {
     DROPDOWN: 1000,
     MODAL: 1050,
     TOOLTIP: 1100,
-    NOTIFICATION: 1150
-  }
-}
+    NOTIFICATION: 1150,
+  },
+};
 
 // API constants
 export const API = {
@@ -290,9 +347,9 @@ export const API = {
   RETRY_DELAY: 1000,
   HEADERS: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json'
-  }
-}
+    Accept: 'application/json',
+  },
+};
 
 // Local storage keys
 export const STORAGE_KEYS = {
@@ -306,5 +363,5 @@ export const STORAGE_KEYS = {
   THEME: 'theme',
   LANGUAGE: 'language',
   SIDEBAR_STATE: 'sidebar_state',
-  TERMINAL_HISTORY: 'terminal_history'
-}
+  TERMINAL_HISTORY: 'terminal_history',
+};

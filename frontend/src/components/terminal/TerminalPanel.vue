@@ -1,36 +1,36 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import { Terminal } from '@xterm/xterm'
-import { FitAddon } from '@xterm/addon-fit'
-import { WebLinksAddon } from '@xterm/addon-web-links'
-import '@xterm/xterm/css/xterm.css'
-import { Plus, Close, Refresh } from '@element-plus/icons-vue'
-import { ElTabs, ElTabPane, ElButton, ElSelect, ElOption } from 'element-plus'
-import { useAppStore } from '../../stores/app'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { invoke } from '@tauri-apps/api/core';
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import '@xterm/xterm/css/xterm.css';
+import { Plus, Close, Refresh } from '@element-plus/icons-vue';
+import { ElTabs, ElTabPane, ElButton, ElSelect, ElOption } from 'element-plus';
+import { useAppStore } from '../../stores/appStore';
 
-const appStore = useAppStore()
-const terminalContainer = ref<HTMLElement>()
-const terminals = ref<{ id: string; name: string; terminal: Terminal }[]>([])
-const activeTerminalIndex = ref(0)
-const fitAddon = ref<FitAddon>()
+const appStore = useAppStore();
+const terminalContainer = ref<HTMLElement>();
+const terminals = ref<{ id: string; name: string; terminal: Terminal }[]>([]);
+const activeTerminalIndex = ref(0);
+const fitAddon = ref<FitAddon>();
 
 // Initialize terminal
 onMounted(() => {
-  createNewTerminal()
-})
+  createNewTerminal();
+});
 
 // Cleanup on unmount
 onUnmounted(() => {
-  terminals.value.forEach(term => {
-    term.terminal.dispose()
-  })
-})
+  terminals.value.forEach((term) => {
+    term.terminal.dispose();
+  });
+});
 
 // Create new terminal
 function createNewTerminal() {
-  const id = `terminal-${Date.now()}`
-  const name = `终端 ${terminals.value.length + 1}`
+  const id = `terminal-${Date.now()}`;
+  const name = `终端 ${terminals.value.length + 1}`;
 
   // Create terminal instance
   const terminal = new Terminal({
@@ -43,152 +43,154 @@ function createNewTerminal() {
       foreground: getComputedStyle(document.documentElement)
         .getPropertyValue('--color-text')
         .trim(),
-      cursor: getComputedStyle(document.documentElement)
-        .getPropertyValue('--color-primary')
-        .trim(),
+      cursor: getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim(),
     },
     cursorBlink: true,
     scrollback: 1000,
-  })
+  });
 
   // Add addons
-  const fitAddonInstance = new FitAddon()
-  const webLinksAddon = new WebLinksAddon()
+  const fitAddonInstance = new FitAddon();
+  const webLinksAddon = new WebLinksAddon();
 
-  terminal.loadAddon(fitAddonInstance)
-  terminal.loadAddon(webLinksAddon)
+  terminal.loadAddon(fitAddonInstance);
+  terminal.loadAddon(webLinksAddon);
 
   // Store terminal
-  terminals.value.push({ id, name, terminal })
-  activeTerminalIndex.value = terminals.value.length - 1
+  terminals.value.push({ id, name, terminal });
+  activeTerminalIndex.value = terminals.value.length - 1;
 
   // Initialize terminal after DOM update
   nextTick(() => {
-    const container = terminalContainer.value
+    const container = terminalContainer.value;
     if (container) {
-      terminal.open(container)
-      fitAddonInstance.fit()
+      terminal.open(container);
+      fitAddonInstance.fit();
 
       // Write welcome message
-      terminal.writeln('\x1b[1;32m欢迎使用 Code AI Assistant 终端\x1b[0m')
-      terminal.writeln('输入 "help" 查看可用命令')
-      terminal.writeln('')
+      terminal.writeln('\x1b[1;32m欢迎使用 Code AI Assistant 终端\x1b[0m');
+      terminal.writeln('输入 "help" 查看可用命令');
+      terminal.writeln('');
 
       // Set up command handling
-      setupCommandHandling(terminal)
+      setupCommandHandling(terminal);
     }
-  })
+  });
 }
 
 // Set up command handling
 function setupCommandHandling(terminal: Terminal) {
-  let command = ''
+  let command = '';
 
-  terminal.onData(data => {
-    if (data === '\r') { // Enter key
-      terminal.writeln('')
-      handleCommand(command, terminal)
-      command = ''
-      terminal.write('$ ')
-    } else if (data === '\u007F') { // Backspace
+  terminal.onData((data) => {
+    if (data === '\r') {
+      // Enter key
+      terminal.writeln('');
+      handleCommand(command, terminal);
+      command = '';
+      terminal.write('$ ');
+    } else if (data === '\u007F') {
+      // Backspace
       if (command.length > 0) {
-        command = command.slice(0, -1)
-        terminal.write('\b \b')
+        command = command.slice(0, -1);
+        terminal.write('\b \b');
       }
-    } else if (data === '\u0003') { // Ctrl+C
-      terminal.writeln('^C')
-      command = ''
-      terminal.write('$ ')
-    } else if (data >= ' ' && data <= '~') { // Printable characters
-      command += data
-      terminal.write(data)
+    } else if (data === '\u0003') {
+      // Ctrl+C
+      terminal.writeln('^C');
+      command = '';
+      terminal.write('$ ');
+    } else if (data >= ' ' && data <= '~') {
+      // Printable characters
+      command += data;
+      terminal.write(data);
     }
-  })
+  });
 
   // Initial prompt
-  terminal.write('$ ')
+  terminal.write('$ ');
 }
 
 // Handle command execution
 async function handleCommand(command: string, terminal: Terminal) {
-  const trimmedCommand = command.trim()
+  const trimmedCommand = command.trim();
 
   if (!trimmedCommand) {
-    return
+    return;
   }
 
   // Built-in commands
   if (trimmedCommand === 'help') {
-    terminal.writeln('可用命令:')
-    terminal.writeln('  help     - 显示此帮助信息')
-    terminal.writeln('  clear    - 清空终端')
-    terminal.writeln('  ls       - 列出文件')
-    terminal.writeln('  pwd      - 显示当前目录')
-    terminal.writeln('  echo     - 显示文本')
-    terminal.writeln('  exit     - 退出终端')
-    return
+    terminal.writeln('可用命令:');
+    terminal.writeln('  help     - 显示此帮助信息');
+    terminal.writeln('  clear    - 清空终端');
+    terminal.writeln('  ls       - 列出文件');
+    terminal.writeln('  pwd      - 显示当前目录');
+    terminal.writeln('  echo     - 显示文本');
+    terminal.writeln('  exit     - 退出终端');
+    return;
   }
 
   if (trimmedCommand === 'clear') {
-    terminal.clear()
-    terminal.write('$ ')
-    return
+    terminal.clear();
+    terminal.write('$ ');
+    return;
   }
 
   if (trimmedCommand === 'exit') {
-    const index = terminals.value.findIndex(t => t.terminal === terminal)
+    const index = terminals.value.findIndex((t) => t.terminal === terminal);
     if (index >= 0) {
-      closeTerminal(index)
+      closeTerminal(index);
     }
-    return
+    return;
   }
 
   // Execute command via Tauri
   try {
-    const [cmd, ...args] = trimmedCommand.split(' ')
+    const [cmd, ...args] = trimmedCommand.split(' ');
     const result = await invoke('execute_command', {
       command: cmd,
       args,
       cwd: '.',
-    })
+    });
 
     if (result) {
-      terminal.writeln(result)
+      terminal.writeln(result);
     }
   } catch (error) {
-    terminal.writeln(`\x1b[1;31m错误: ${error}\x1b[0m`)
+    terminal.writeln(`\x1b[1;31m错误: ${error}\x1b[0m`);
   }
 
-  terminal.write('$ ')
+  terminal.write('$ ');
 }
 
 // Close terminal
 function closeTerminal(index: number) {
   if (terminals.value[index]) {
-    terminals.value[index].terminal.dispose()
-    terminals.value.splice(index, 1)
+    terminals.value[index].terminal.dispose();
+    terminals.value.splice(index, 1);
 
     if (terminals.value.length === 0) {
-      createNewTerminal()
+      createNewTerminal();
     } else if (activeTerminalIndex.value >= terminals.value.length) {
-      activeTerminalIndex.value = terminals.value.length - 1
+      activeTerminalIndex.value = terminals.value.length - 1;
     }
   }
 }
 
 // Switch terminal
 function switchTerminal(index: number) {
-  activeTerminalIndex.value = index
+  activeTerminalIndex.value = index;
 }
 
 // Refresh terminal
 function refreshTerminal() {
-  const terminal = terminals.value[activeTerminalIndex.value]?.terminal
+  const terminal = terminals.value[activeTerminalIndex.value]?.terminal;
   if (terminal) {
-    terminal.clear()
-    terminal.writeln('\x1b[1;32m终端已刷新\x1b[0m')
-    terminal.writeln('')
-    terminal.write('$ ')
+    terminal.clear();
+    terminal.writeln('\x1b[1;32m终端已刷新\x1b[0m');
+    terminal.writeln('');
+    terminal.write('$ ');
   }
 }
 </script>
@@ -214,23 +216,9 @@ function refreshTerminal() {
         </ElTabs>
 
         <div class="flex items-center space-x-2">
-          <ElButton
-            :icon="Plus"
-            size="small"
-            text
-            @click="createNewTerminal"
-          >
-            新建
-          </ElButton>
+          <ElButton :icon="Plus" size="small" text @click="createNewTerminal"> 新建 </ElButton>
 
-          <ElButton
-            :icon="Refresh"
-            size="small"
-            text
-            @click="refreshTerminal"
-          >
-            刷新
-          </ElButton>
+          <ElButton :icon="Refresh" size="small" text @click="refreshTerminal"> 刷新 </ElButton>
 
           <ElSelect
             v-model="appStore.settings.terminalShell"

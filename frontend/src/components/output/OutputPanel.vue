@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue'
-import { ElInput, ElButton, ElSelect, ElOption, ElTooltip } from 'element-plus'
+import { ref, computed } from 'vue';
+import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue';
+import { ElInput, ElButton, ElSelect, ElOption, ElTooltip } from 'element-plus';
 
 const logs = ref<string[]>([
   '2024-01-15 10:30:25 INFO - 应用启动成功',
@@ -12,42 +12,42 @@ const logs = ref<string[]>([
   '2024-01-15 10:30:30 INFO - 终端初始化完成',
   '2024-01-15 10:30:31 DEBUG - 监听文件变化',
   '2024-01-15 10:30:32 INFO - 工作区加载完成: default',
-])
+]);
 
-const searchQuery = ref('')
-const logLevel = ref('all')
-const isPaused = ref(false)
+const searchQuery = ref('');
+const logLevel = ref('all');
+const isPaused = ref(false);
 
 // Filter logs based on search and level
 const filteredLogs = computed(() => {
-  return logs.value.filter(log => {
+  return logs.value.filter((log) => {
     // Filter by level
     if (logLevel.value !== 'all') {
-      const level = log.split(' ')[2]?.toLowerCase()
+      const level = log.split(' ')[2]?.toLowerCase();
       if (level !== logLevel.value.toLowerCase()) {
-        return false
+        return false;
       }
     }
 
     // Filter by search query
     if (searchQuery.value) {
-      return log.toLowerCase().includes(searchQuery.value.toLowerCase())
+      return log.toLowerCase().includes(searchQuery.value.toLowerCase());
     }
 
-    return true
-  })
-})
+    return true;
+  });
+});
 
 // Clear logs
 function clearLogs() {
   if (confirm('确定要清空所有日志吗？')) {
-    logs.value = []
+    logs.value = [];
   }
 }
 
 // Toggle pause
 function togglePause() {
-  isPaused.value = !isPaused.value
+  isPaused.value = !isPaused.value;
 }
 </script>
 
@@ -75,27 +75,15 @@ function togglePause() {
       </div>
 
       <div class="flex items-center justify-between">
-        <div class="text-sm text-text-secondary">
-          共 {{ filteredLogs.length }} 条日志
-        </div>
+        <div class="text-sm text-text-secondary">共 {{ filteredLogs.length }} 条日志</div>
 
         <div class="flex items-center space-x-2">
           <ElTooltip :content="isPaused ? '继续输出' : '暂停输出'" placement="bottom">
-            <ElButton
-              :icon="isPaused ? Play : Pause"
-              size="small"
-              text
-              @click="togglePause"
-            />
+            <ElButton :icon="isPaused ? Play : Pause" size="small" text @click="togglePause" />
           </ElTooltip>
 
           <ElTooltip content="清空日志" placement="bottom">
-            <ElButton
-              :icon="Delete"
-              size="small"
-              text
-              @click="clearLogs"
-            />
+            <ElButton :icon="Delete" size="small" text @click="clearLogs" />
           </ElTooltip>
         </div>
       </div>

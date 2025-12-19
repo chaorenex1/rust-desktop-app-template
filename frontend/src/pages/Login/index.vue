@@ -1,45 +1,47 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElButton, ElCard, ElForm, ElFormItem, ElInput, ElMessage } from 'element-plus'
-import { User, Lock } from '@element-plus/icons-vue'
+import { ref } from 'vue';
+import { useRouter } from 'vue-router';
+import { ElButton, ElCard, ElForm, ElFormItem, ElInput, ElMessage } from 'element-plus';
+import { User, Lock } from '@element-plus/icons-vue';
 
-const router = useRouter()
+const router = useRouter();
 
 const loginForm = ref({
   username: '',
   password: '',
-})
+});
 
-const isLoading = ref(false)
+const isLoading = ref(false);
 
 async function handleLogin() {
   if (!loginForm.value.username || !loginForm.value.password) {
-    ElMessage.warning('请输入用户名和密码')
-    return
+    ElMessage.warning('请输入用户名和密码');
+    return;
   }
 
-  isLoading.value = true
+  isLoading.value = true;
   try {
     // TODO: Implement actual login logic
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    ElMessage.success('登录成功')
-    router.push('/dashboard')
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    ElMessage.success('登录成功');
+    router.push('/dashboard');
   } catch (error) {
-    ElMessage.error('登录失败')
+    ElMessage.error('登录失败');
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 
 function goToHome() {
-  router.push('/')
+  router.push('/');
 }
 </script>
 
 <template>
-  <div class="login-page min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
+  <div
+    class="login-page min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800"
+  >
     <ElCard class="w-full max-w-md" shadow="always">
       <template #header>
         <div class="text-center">
@@ -85,9 +87,7 @@ function goToHome() {
       </ElForm>
 
       <div class="text-center mt-4">
-        <ElButton text @click="goToHome">
-          返回首页
-        </ElButton>
+        <ElButton text @click="goToHome"> 返回首页 </ElButton>
       </div>
     </ElCard>
   </div>

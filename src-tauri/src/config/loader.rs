@@ -2,142 +2,44 @@
 //!
 //! This module handles loading and managing application configuration.
 
-use serde::{Deserialize, Serialize};
-use tracing::info;
-
 use crate::utils::error::{AppError, AppResult};
+use crate::config::schema::AppConfig;
 
-/// Application configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppConfig {
-    /// Application settings
-    pub app: AppSettings,
-    /// Database settings
-    pub database: DatabaseSettings,
-    /// AI service settings
-    pub ai: AiSettings,
-    /// CLI tool settings
-    pub cli: CliToolSettings,
-    /// Workspace settings
-    pub workspace: WorkspaceSettings,
+/// Get user home directory across multiple operating systems
+pub fn get_user_home() -> AppResult<String> {
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| AppError::ConfigError("Failed to get user home directory".to_string()))?;
+    Ok(home_dir.to_string_lossy().to_string())
 }
 
-/// Application settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AppSettings {
-    /// Application name
-    pub name: String,
-    /// Application version
-    pub version: String,
-    /// Data directory
-    pub data_dir: String,
-    /// Log level
-    pub log_level: String,
-    /// Enable debug mode
-    pub debug: bool,
+pub fn get_default_data_dir() -> AppResult<String> {
+    let config_dir = dirs::home_dir()
+        .ok_or_else(|| AppError::ConfigError("Failed to get config directory".to_string()))?
+        .join("code-ai-assistant");
+    Ok(config_dir.to_string_lossy().to_string())
 }
 
-/// Database settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DatabaseSettings {
-    /// Database URL
-    pub url: String,
-    /// Maximum connections
-    pub max_connections: u32,
-    /// Minimum connections
-    pub min_connections: u32,
+use config::{Config, Environment, File as ConfigFile};
+
+pub fn load_settings() -> AppResult<AppConfig> {
+    // Step 1: 构建默认 Map（从 AppConfig::default() 序列化键值对）
+    let defaults =  serde_json::to_string(&AppConfig::default())?;
+    // Step 2: 构建 Config 对象，添加多个配置源
+    let cfg: Config = Config::builder()
+        .add_source(ConfigFile::from_str(&defaults, config::FileFormat::Json))
+        .add_source(ConfigFile::with_name("config.toml").required(false))
+        .add_source(Environment::with_prefix(".env"))
+        .build()?;    // Step 2: 反序列化为 AppConfig（自动合并覆盖）
+    let config: AppConfig = cfg.try_deserialize()
+        .map_err(|e| AppError::ConfigError(format!("Failed to deserialize config: {}", e)))?;
+    // Step 3: 返回最终配置
+    Ok(config)
 }
 
-/// AI service settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AiSettings {
-    /// Default AI model
-    pub default_model: String,
-    /// API timeout in seconds
-    pub api_timeout: u64,
-    /// Maximum tokens
-    pub max_tokens: u32,
-    /// Temperature
-    pub temperature: f32,
-}
-
-/// CLI tool settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CliToolSettings {
-    /// Node.js path
-    pub nodejs_path: String,
-    /// Python path
-    pub python_path: String,
-    /// Git path
-    pub git_path: String,
-    /// Default shell
-    pub default_shell: String,
-}
-
-/// Workspace settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceSettings {
-    /// Default workspace name
-    pub default_workspace: String,
-    /// Auto-save interval in seconds
-    pub auto_save_interval: u64,
-    /// Enable file watching
-    pub enable_file_watching: bool,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            app: AppSettings {
-                name: "Code AI Assistant".to_string(),
-                version: "0.1.0".to_string(),
-                data_dir: "data".to_string(),
-                log_level: "info".to_string(),
-                debug: false,
-            },
-            database: DatabaseSettings {
-                url: "sqlite://data/app.db?mode=rwc".to_string(),
-                max_connections: 10,
-                min_connections: 1,
-            },
-            ai: AiSettings {
-                default_model: "claude-3-5-sonnet".to_string(),
-                api_timeout: 30,
-                max_tokens: 4096,
-                temperature: 0.7,
-            },
-            cli: CliToolSettings {
-                nodejs_path: "node".to_string(),
-                python_path: "python".to_string(),
-                git_path: "git".to_string(),
-                default_shell: "bash".to_string(),
-            },
-            workspace: WorkspaceSettings {
-                default_workspace: "default".to_string(),
-                auto_save_interval: 30,
-                enable_file_watching: true,
-            },
-        }
-    }
-}
 
 /// Load application configuration
 pub fn load_config() -> AppResult<AppConfig> {
-    info!("Loading application configuration...");
-
-    // Try to load configuration from file
-    let config = match load_config_from_file() {
-        Ok(config) => {
-            info!("Configuration loaded from file");
-            config
-        }
-        Err(_) => {
-            info!("No configuration file found, using defaults");
-            AppConfig::default()
-        }
-    };
-
-    info!("Configuration loaded successfully");
+    let config = load_settings()?;
     Ok(config)
 }
 
@@ -164,8 +66,6 @@ fn load_config_from_file() -> AppResult<AppConfig> {
 
 /// Save configuration to file
 pub fn save_config(config: &AppConfig) -> AppResult<()> {
-    info!("Saving application configuration...");
-
     let config_dir = dirs::config_dir()
         .ok_or_else(|| AppError::ConfigError("Failed to get config directory".to_string()))?
         .join("code-ai-assistant");
@@ -181,6 +81,6 @@ pub fn save_config(config: &AppConfig) -> AppResult<()> {
     std::fs::write(&config_file, config_str)
         .map_err(|e| AppError::ConfigError(format!("Failed to write config file: {}", e)))?;
 
-    info!("Configuration saved successfully to: {:?}", config_file);
+    tracing::info!("Configuration saved successfully to: {:?}", config_file);
     Ok(())
 }
