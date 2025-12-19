@@ -11,6 +11,7 @@ import {
   ElDropdownItem,
 } from 'element-plus';
 import { useFileStore } from '../../stores/filesStore';
+import { getIcon } from '../../utils/fileIcons';
 
 const fileStore = useFileStore();
 const searchQuery = ref('');
@@ -98,12 +99,15 @@ function refreshDirectory() {
           @click="handleNodeClick(file)"
           @contextmenu="handleContextMenu($event, file)"
         >
-          <ElIcon :size="16" class="mr-2">
-            <Folder v-if="file.isDirectory" />
-            <Document v-else />
-          </ElIcon>
+          <!-- File Icon with color -->
+          <span
+            class="mr-2 text-base leading-none flex-shrink-0"
+            :style="{ color: getIcon(file.name, file.isDirectory).color }"
+          >
+            {{ getIcon(file.name, file.isDirectory).icon }}
+          </span>
 
-          <span class="flex-1 text-ellipsis">{{ file.name }}</span>
+          <span class="flex-1 text-ellipsis truncate" :title="file.name">{{ file.name }}</span>
 
           <div class="opacity-0 group-hover:opacity-100">
             <ElDropdown trigger="click" @command="(command) => handleContextCommand(command, file)">

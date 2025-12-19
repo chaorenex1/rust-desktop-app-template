@@ -35,7 +35,7 @@ pub struct FileContent {
 /// Read file content
 #[tauri::command]
 pub async fn read_file(path: String) -> Result<FileContent, String> {
-    info!("Reading file: {}", path);
+    debug!("Reading file: {}", path);
     let metadata = fs::metadata(&path).map_err(|e| {
         error!("Failed to stat file {}: {:?}", path, e);
         e.to_string()
@@ -57,7 +57,7 @@ pub async fn read_file(path: String) -> Result<FileContent, String> {
 /// Read file content
 #[tauri::command]
 pub async fn read_max_file(path: String) -> Result<FileContent, String> {
-    info!("Reading file: {}", path);
+    debug!("Reading file: {}", path);
     // 先检查元数据，避免将目录或超大文件直接读入内存导致应用卡死
     let metadata = fs::metadata(&path).map_err(|e| {
         error!("Failed to stat file {}: {:?}", path, e);
@@ -102,7 +102,7 @@ pub async fn read_max_file(path: String) -> Result<FileContent, String> {
 /// Write file content
 #[tauri::command]
 pub async fn write_file(path: String, content: String) -> Result<(), String> {
-    info!("Writing file: {}", path);
+    debug!("Writing file: {}", path);
     
     async_runtime::spawn_blocking(move || {
         fs::write(&path, content).map_err(|e| e.to_string())
@@ -114,7 +114,7 @@ pub async fn write_file(path: String, content: String) -> Result<(), String> {
 /// List files in directory
 #[tauri::command]
 pub async fn list_files(path: String) -> Result<Vec<FileEntry>, String> {
-    info!("Listing files in: {}", path);
+    debug!("Listing files in: {}", path);
 
     async_runtime::spawn_blocking(move || {
         let entries = fs::read_dir(&path).map_err(|e| e.to_string())?;
@@ -155,7 +155,7 @@ pub async fn list_files(path: String) -> Result<Vec<FileEntry>, String> {
 /// Create file
 #[tauri::command]
 pub async fn create_file(path: String) -> Result<(), String> {
-    info!("Creating file: {}", path);
+    debug!("Creating file: {}", path);
     
     async_runtime::spawn_blocking(move || {
         fs::File::create(&path).map_err(|e| e.to_string())?;
@@ -168,7 +168,7 @@ pub async fn create_file(path: String) -> Result<(), String> {
 /// Delete file
 #[tauri::command]
 pub async fn delete_file(path: String) -> Result<(), String> {
-    info!("Deleting file: {}", path);
+    debug!("Deleting file: {}", path);
     
     async_runtime::spawn_blocking(move || {
         let path_ref = Path::new(&path);
@@ -185,7 +185,7 @@ pub async fn delete_file(path: String) -> Result<(), String> {
 /// Rename file
 #[tauri::command]
 pub async fn rename_file(old_path: String, new_path: String) -> Result<(), String> {
-    info!("Renaming file: {} -> {}", old_path, new_path);
+    debug!("Renaming file: {} -> {}", old_path, new_path);
     
     async_runtime::spawn_blocking(move || {
         fs::rename(&old_path, &new_path).map_err(|e| e.to_string())
@@ -197,7 +197,7 @@ pub async fn rename_file(old_path: String, new_path: String) -> Result<(), Strin
 /// Create directory
 #[tauri::command]
 pub async fn create_directory(path: String) -> Result<(), String> {
-    info!("Creating directory: {}", path);
+    debug!("Creating directory: {}", path);
     
     async_runtime::spawn_blocking(move || {
         fs::create_dir_all(&path).map_err(|e| e.to_string())
@@ -209,7 +209,7 @@ pub async fn create_directory(path: String) -> Result<(), String> {
 /// List directories
 #[tauri::command]
 pub async fn list_directories(path: String) -> Result<Vec<String>, String> {
-    info!("Listing directories in: {}", path);
+    debug!("Listing directories in: {}", path);
 
     async_runtime::spawn_blocking(move || {
         let entries = fs::read_dir(&path).map_err(|e| e.to_string())?;
@@ -231,7 +231,7 @@ pub async fn list_directories(path: String) -> Result<Vec<String>, String> {
 /// Delete directory
 #[tauri::command]
 pub async fn delete_directory(path: String) -> Result<(), String> {
-    info!("Deleting directory: {}", path);
+    debug!("Deleting directory: {}", path);
     
     async_runtime::spawn_blocking(move || {
         fs::remove_dir_all(&path).map_err(|e| e.to_string())

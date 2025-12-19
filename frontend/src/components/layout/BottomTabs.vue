@@ -30,6 +30,8 @@ const emit = defineEmits<{
 const appStore = useAppStore();
 const fileStore = useFileStore();
 
+const currentFile = computed(() => fileStore.currentFile);
+
 const FOOTER_HEIGHT = 32;
 
 const bottomPanelStyle = computed(() => ({
@@ -93,11 +95,11 @@ function onSelectTab(key: string) {
         <div class="flex items-center space-x-4">
           <span>工作区: {{ appStore.currentWorkspace.name }}</span>
           <span>|</span>
-          <span>文件: {{ fileStore.currentFile?.path || '未选择文件' }}</span>
+          <span>文件: {{ currentFile?.path || '未选择文件' }}</span>
         </div>
 
         <div class="flex items-center space-x-4">
-          <span>AI模型: {{ appStore.currentAiModel }}</span>
+          <span>AI模型:</span>
           <span>|</span>
           <span>状态: {{ appStore.isConnected ? '已连接' : '未连接' }}</span>
         </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Folder, Document, Plus, Refresh, Search } from '@element-plus/icons-vue';
+import { Folder, Document, Plus, Refresh, Search, More } from '@element-plus/icons-vue';
 import { ElTree, ElInput, ElButton, ElIcon } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
@@ -8,6 +8,7 @@ import { showError, showWarning } from '@/utils/toast';
 
 import { listFiles, readFile, writeFile, createDirectory } from '@/services/tauri/commands';
 import type { FileItem } from '@/utils/types';
+import { getIcon } from '@/utils/fileIcons';
 
 const fileStore = useFileStore();
 const appStore = useAppStore();
@@ -22,6 +23,7 @@ interface FileNode {
   size?: number;
   modified?: string;
   isLeaf?: boolean;
+  icon?: FileIconConfig;
 }
 
 const treeData = ref<FileNode[]>([]);
@@ -78,8 +80,6 @@ async function initialize(refresh: boolean = false) {
     isLeaf: false,
   };
 
-  console.debug('Root directory list:', fileStore.files);
-
   treeData.value = fileStore.files.map((file) => ({
     name: file.name,
     path: file.path,
@@ -87,6 +87,7 @@ async function initialize(refresh: boolean = false) {
     size: file.size,
     modified: file.modified,
     isLeaf: !file.isDirectory,
+    icon: getIcon(file.name, file.isDirectory),
   }));
 }
 
@@ -123,16 +124,8 @@ async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
       size: file.size,
       modified: file.modified,
       isLeaf: !file.isDirectory,
+      icon: getIcon(file.name, file.isDirectory),
     }));
-
-    console.debug(
-      'Children nodes:',
-      children.map((c) => ({
-        name: c.name,
-        isDirectory: c.isDirectory,
-        isLeaf: c.isLeaf,
-      }))
-    );
 
     resolve(children);
   } catch (error) {
@@ -188,6 +181,26 @@ async function createNew(isDirectory = false) {
 async function refreshDirectory() {
   await initialize(true);
 }
+
+// Handle context menu commands
+function handleContextCommand(command: string, data: FileNode) {
+  console.log('Context command:', command, data);
+  // TODO: Implement context menu actions
+  switch (command) {
+    case 'rename':
+      // Implement rename
+      break;
+    case 'delete':
+      // Implement delete
+      break;
+    case 'copy_path':
+      // Copy path to clipboard
+      break;
+    case 'open_terminal':
+      // Open terminal in directory
+      break;
+  }
+}
 </script>
 
 <template>
@@ -237,11 +250,37 @@ async function refreshDirectory() {
       >
         <template #default="{ data }">
           <div class="flex items-center px-1 py-1">
-            <ElIcon :size="16" class="mr-2">
+            <!-- <ElIcon :size="16" class="mr-2">
               <Folder v-if="data.isDirectory" />
               <Document v-else />
-            </ElIcon>
+            </ElIcon> -->
+            <span
+              class="mr-2 text-base leading-none flex-shrink-0"
+              :style="{ color: data.icon.color }"
+            >
+              {{ data.icon.icon }}
+            </span>
             <span class="flex-1 truncate">{{ data.name }}</span>
+            <div class="opacity-0 group-hover:opacity-100">
+              <ElDropdown
+                trigger="click"
+                @command="(command) => handleContextCommand(command, data)"
+              >
+                <span class="el-dropdown-link">
+                  <ElIcon :size="14"><More /></ElIcon>
+                </span>
+                <template #dropdown>
+                  <ElDropdownMenu>
+                    <ElDropdownItem command="rename">重命名</ElDropdownItem>
+                    <ElDropdownItem command="delete" divided>删除</ElDropdownItem>
+                    <ElDropdownItem command="copy_path">复制路径</ElDropdownItem>
+                    <ElDropdownItem command="open_terminal" v-if="data.isDirectory"
+                      >在终端打开</ElDropdownItem
+                    >
+                  </ElDropdownMenu>
+                </template>
+              </ElDropdown>
+            </div>
           </div>
         </template>
       </ElTree>
