@@ -1,12 +1,16 @@
-import type { FileEntry, ChatMessage, Workspace } from './types';
+import type { FileItem, ChatMessage, Workspace } from './types';
 
 // File system helpers
 export function getFileExtension(filename: string): string {
   const parts = filename.split('.');
-  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+  if (parts.length <= 1) {
+    return '';
+  }
+  const last = parts[parts.length - 1] ?? '';
+  return last.toLowerCase();
 }
 
-export function getFileIcon(file: FileEntry): string {
+export function getFileIcon(file: FileItem): string {
   const extension = getFileExtension(file.name);
 
   const iconMap: Record<string, string> = {
@@ -90,11 +94,13 @@ export function getFileIcon(file: FileEntry): string {
     rar: 'archive',
   };
 
-  return iconMap[extension] || (file.type === 'directory' ? 'folder' : 'file');
+  return iconMap[extension] || (file.isDirectory ? 'folder' : 'file');
 }
 
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) {
+    return '0 B';
+  }
 
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -166,7 +172,9 @@ export function formatChatMessage(message: ChatMessage): string {
 }
 
 export function truncateChatMessage(message: string, maxLength: number = 100): string {
-  if (message.length <= maxLength) return message;
+  if (message.length <= maxLength) {
+    return message;
+  }
   return message.substring(0, maxLength) + '...';
 }
 
@@ -177,10 +185,14 @@ export function getWorkspaceDisplayName(workspace: Workspace): string {
 
 export function validateWorkspacePath(path: string): boolean {
   // Basic validation - check if path is not empty and doesn't contain invalid characters
-  if (!path || path.trim().length === 0) return false;
+  if (!path || path.trim().length === 0) {
+    return false;
+  }
 
   const invalidChars = /[<>:"|?*]/;
-  if (invalidChars.test(path)) return false;
+  if (invalidChars.test(path)) {
+    return false;
+  }
 
   return true;
 }
@@ -239,7 +251,9 @@ export function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array];
   for (let i = shuffled.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    const temp = shuffled[i]!;
+    shuffled[i] = shuffled[j]!;
+    shuffled[j] = temp;
   }
   return shuffled;
 }
@@ -292,12 +306,17 @@ export function roundToDecimal(value: number, decimals: number = 2): number {
 // Color helpers
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return { r: 0, g: 0, b: 0 };
+  if (!result) {
+    return { r: 0, g: 0, b: 0 };
+  }
+  const rHex = result[1]!;
+  const gHex = result[2]!;
+  const bHex = result[3]!;
 
   return {
-    r: parseInt(result[1], 16),
-    g: parseInt(result[2], 16),
-    b: parseInt(result[3], 16),
+    r: parseInt(rHex, 16),
+    g: parseInt(gHex, 16),
+    b: parseInt(bHex, 16),
   };
 }
 
@@ -316,10 +335,12 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
-  let timeout: NodeJS.Timeout | null = null;
+  let timeout: ReturnType<typeof setTimeout> | null = null;
 
   return (...args: Parameters<T>) => {
-    if (timeout) clearTimeout(timeout);
+    if (timeout) {
+      clearTimeout(timeout);
+    }
     timeout = setTimeout(() => func(...args), wait);
   };
 }

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import type {
   AppSettings,
-  FileEntry,
+  FileItem,
   AIModel,
   Workspace,
   CommandResult,
@@ -18,7 +18,7 @@ export async function writeFile(path: string, content: string): Promise<void> {
   return invoke('write_file', { path, content });
 }
 
-export async function listFiles(path: string): Promise<FileEntry[]> {
+export async function listFiles(path: string): Promise<FileItem[]> {
   return invoke('list_files', { path });
 }
 
@@ -38,7 +38,7 @@ export async function createDirectory(path: string): Promise<void> {
   return invoke('create_directory', { path });
 }
 
-export async function listDirectories(path: string): Promise<FileEntry[]> {
+export async function listDirectories(path: string): Promise<String[]> {
   return invoke('list_directories', { path });
 }
 

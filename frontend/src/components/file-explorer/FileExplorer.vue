@@ -1,39 +1,154 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
 import { Folder, Document, Plus, Refresh, Search } from '@element-plus/icons-vue';
+import { ElTree, ElInput, ElButton, ElIcon, ElMessage } from 'element-plus';
+import { ref, onMounted, watch } from 'vue';
+import { useFileStore } from '@/stores/filesStore';
+import { useAppStore } from '@/stores/appStore';
+
 import {
-  ElTree,
-  ElInput,
-  ElButton,
-  ElIcon,
-  ElDropdown,
-  ElDropdownMenu,
-  ElDropdownItem,
-} from 'element-plus';
-import { useFileStore } from '../../stores/filesStore';
+  listFiles,
+  readFile,
+  writeFile,
+  createDirectory
+} from '@/services/tauri/commands';
+import { f } from 'vue-router/dist/router-CWoNjPRp.mjs';
+import { da } from 'element-plus/es/locales.mjs';
 
 const fileStore = useFileStore();
-const searchQuery = ref('');
+const appStore = useAppStore();
 
-// Load directory on mount
-onMounted(() => {
-  fileStore.loadDirectory();
+const searchQuery = ref('');
+const treeRef = ref<InstanceType<typeof ElTree> | null>(null);
+
+interface FileNode {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size?: number;
+  modified?: string;
+  isLeaf?: boolean;
+}
+
+const treeData = ref<FileNode[]>([]);
+const rootDirectory = ref<FileNode | null>(null);
+
+
+const defaultProps = {
+  children: 'children',
+  label: 'name',
+  isLeaf: 'isLeaf',
+};
+
+// 初始化根目录列表
+onMounted(async () => {
+  // 如果已经在其他地方加载过目录（例如最近目录或设置面板），直接使用现有数据
+  await initialize();
 });
 
-// Handle node click
-function handleNodeClick(data: any) {
-  if (data.isDirectory) {
-    fileStore.loadDirectory(data.path);
-  } else {
-    fileStore.openFile(data.path);
+// 根据文件列表变化更新根节点
+watch(
+  () => fileStore.files,
+  (files) => {
+    treeData.value = files.map((file) => ({
+      name: file.name,
+      path: file.path,
+      isDirectory: file.isDirectory,
+      size: file.size,
+      modified: file.modified,
+      isLeaf: !file.isDirectory,
+    }));
+  },
+  { deep: true }
+);
+
+async function initialize(refresh: boolean = false) {
+  if (!fileStore.files.length || refresh) {
+    await fileStore.loadDirectory(fileStore.getRootDirectory());
+  }
+  rootDirectory.value = {
+    name: fileStore.currentDirectory,
+    path: fileStore.currentDirectory,
+    isDirectory: true,
+    isLeaf: false,
+  };
+
+  console.debug('Root directory list:', fileStore.files);
+
+  treeData.value = fileStore.files.map((file) => ({
+    name: file.name,
+    path: file.path,
+    isDirectory: file.isDirectory,
+    size: file.size,
+    modified: file.modified,
+    isLeaf: !file.isDirectory,
+  }));
+}
+
+
+// 懒加载子目录（根节点完全由 treeData 提供）
+async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
+  const data = node.data as FileNode | undefined;
+  console.debug('Loading node:', data);
+
+  // 根节点使用 :data="treeData"，这里不再处理
+  if (!data) {
+    return resolve([]);
+  }
+
+  if (!data.isDirectory) {
+    return resolve([]);
+  }
+
+  try {
+    const fileList = await listFiles(data.path);
+
+    const children: FileNode[] = fileList.map((file) => ({
+      name: file.name,
+      path: file.path,
+      isDirectory: file.is_directory,
+      size: file.size,
+      modified: file.modified,
+      isLeaf: !file.is_directory,
+    }));
+    console.debug('node list:', fileList);
+
+    resolve(children);
+  } catch (error) {
+    console.error('加载子目录失败', error);
+    resolve([]);
   }
 }
 
-// Handle context menu
-function handleContextMenu(event: MouseEvent, node: any) {
-  event.preventDefault();
-  // TODO: Implement context menu
-  console.log('Context menu:', node);
+// 过滤节点（搜索）
+function filterNode(value: string, data: any) {
+  if (!value) return true;
+  return data.name.toLowerCase().includes(value.toLowerCase());
+}
+
+watch(searchQuery, (val) => {
+  treeRef.value?.filter(val);
+});
+
+// 处理节点点击：目录展开/收起，文件在编辑器打开
+async function handleNodeClick(data: FileNode, node: any) {
+  console.debug('Node clicked:', data);
+  if (data.isDirectory) {
+    node.expanded = !node.expanded;
+  } else {
+    try {
+      // 显示加载状态
+      fileStore.isLoading = true;
+      await fileStore.openFile(data.path);
+    } catch (error) {
+      console.error('打开文件失败', error);
+      ElMessage.error(
+        (error instanceof Error && error.message) || '打开文件失败（可能不是文本文件或编码不兼容）'
+      );
+    } finally {
+      // 确保加载状态被清除
+      fileStore.isLoading = false;
+    }
+  }
 }
 
 // Create new file/folder
@@ -45,8 +160,8 @@ async function createNew(isDirectory = false) {
 }
 
 // Refresh directory
-function refreshDirectory() {
-  fileStore.loadDirectory(fileStore.currentDirectory);
+async function refreshDirectory() {
+  await initialize(true);
 }
 </script>
 
@@ -56,10 +171,29 @@ function refreshDirectory() {
     <div class="border-b border-border bg-surface p-2">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center space-x-1">
-          <ElButton :icon="Plus" size="small" text @click="createNew(false)"> 文件 </ElButton>
-          <ElButton :icon="Folder" size="small" text @click="createNew(true)"> 文件夹 </ElButton>
+          <ElButton
+            :icon="Plus"
+            size="small"
+            text
+            @click="createNew(false)"
+          >
+            文件
+          </ElButton>
+          <ElButton
+            :icon="Folder"
+            size="small"
+            text
+            @click="createNew(true)"
+          >
+            文件夹
+          </ElButton>
         </div>
-        <ElButton :icon="Refresh" size="small" text @click="refreshDirectory" />
+        <ElButton
+          :icon="Refresh"
+          size="small"
+          text
+          @click="refreshDirectory"
+        />
       </div>
 
       <ElInput
@@ -73,78 +207,63 @@ function refreshDirectory() {
 
     <!-- File Tree -->
     <div class="flex-1 overflow-auto p-2">
-      <div v-if="fileStore.isLoading" class="flex-col-center h-full">
+      <div
+        v-if="fileStore.isLoading"
+        class="flex flex-col items-center justify-center h-full"
+      >
         <div
           class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"
-        ></div>
-        <p class="mt-2 text-sm text-text-secondary">加载中...</p>
+        />
+        <p class="mt-2 text-sm text-text-secondary">
+          加载中...
+        </p>
       </div>
 
-      <div v-else-if="fileStore.error" class="text-center p-4 text-error">
+      <div
+        v-else-if="fileStore.error && !treeData.length"
+        class="text-center p-4 text-error"
+      >
         {{ fileStore.error }}
       </div>
 
-      <div v-else-if="fileStore.files.length === 0" class="text-center p-4 text-text-secondary">
-        目录为空
-      </div>
-
-      <div v-else class="space-y-1">
-        <div
-          v-for="file in fileStore.files.filter((f) =>
-            searchQuery ? f.name.toLowerCase().includes(searchQuery.toLowerCase()) : true
-          )"
-          :key="file.path"
-          class="flex items-center p-2 hover:bg-surface rounded cursor-pointer group"
-          @click="handleNodeClick(file)"
-          @contextmenu="handleContextMenu($event, file)"
-        >
-          <ElIcon :size="16" class="mr-2">
-            <Folder v-if="file.isDirectory" />
-            <Document v-else />
-          </ElIcon>
-
-          <span class="flex-1 text-ellipsis">{{ file.name }}</span>
-
-          <div class="opacity-0 group-hover:opacity-100">
-            <ElDropdown trigger="click" @command="(command) => handleContextCommand(command, file)">
-              <span class="el-dropdown-link">
-                <ElIcon :size="14"><More /></ElIcon>
-              </span>
-              <template #dropdown>
-                <ElDropdownMenu>
-                  <ElDropdownItem command="rename">重命名</ElDropdownItem>
-                  <ElDropdownItem command="delete" divided>删除</ElDropdownItem>
-                  <ElDropdownItem command="copy_path">复制路径</ElDropdownItem>
-                  <ElDropdownItem command="open_terminal" v-if="file.isDirectory"
-                    >在终端打开</ElDropdownItem
-                  >
-                </ElDropdownMenu>
-              </template>
-            </ElDropdown>
+      <ElTree
+        v-else
+        ref="treeRef"
+        :data="treeData"
+        :props="defaultProps"
+        node-key="path"
+        lazy
+        highlight-current
+        :load="loadNode"
+        :filter-node-method="filterNode"
+        @node-click="handleNodeClick"
+      >
+        <template #default="{ data }">
+          <div class="flex items-center px-1 py-1">
+            <ElIcon
+              :size="16"
+              class="mr-2"
+            >
+              <Folder v-if="data.isDirectory" />
+              <Document v-else />
+            </ElIcon>
+            <span class="flex-1 truncate">{{ data.name }}</span>
           </div>
-        </div>
-      </div>
+        </template>
+      </ElTree>
     </div>
 
     <!-- Current Path -->
     <div class="border-t border-border bg-surface p-2 text-xs text-text-secondary">
-      <div class="text-ellipsis" :title="fileStore.currentDirectory">
+      <div
+        class="truncate"
+        :title="fileStore.currentDirectory"
+      >
         当前目录: {{ fileStore.currentDirectory }}
       </div>
     </div>
   </div>
 </template>
-
-<script lang="ts">
-// Separate script block for component registration
-import { More } from '@element-plus/icons-vue';
-
-export default {
-  components: {
-    More,
-  },
-};
-</script>
 
 <style scoped>
 :deep(.el-tree) {

@@ -50,6 +50,7 @@ async function selectDirectory() {
     if (result && typeof result === 'string') {
       // 加载目录
       await fileStore.loadDirectory(result);
+      fileStore.setRootDirectory(result);
 
       // 创建工作区
       await appStore.createWorkspace(result, true);
@@ -74,7 +75,9 @@ async function selectDirectory() {
 
 async function openRecentDirectory(dir: Workspace) {
   try {
+    console.debug('Opening recent directory:', dir);
     await fileStore.loadDirectory(dir.path);
+    fileStore.setRootDirectory(dir.path);
     // 创建工作区
     await appStore.switchWorkspace(dir.id);
 

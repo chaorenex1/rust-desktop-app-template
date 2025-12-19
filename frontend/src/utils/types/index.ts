@@ -147,6 +147,7 @@ export interface FileItem {
 }
 
 export interface FileContent {
+  name: string;
   path: string;
   content: string;
   language?: string;
