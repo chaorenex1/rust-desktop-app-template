@@ -139,23 +139,30 @@ export const useAppStore = defineStore('app', () => {
   async function switchWorkspace(workspaceId: string) {
     try {
       const workspace: Workspace = await switchWorkspaceCommand(workspaceId);
-      const oldWorkspace:Workspace = workspaces.value.find((w) => w.id === currentWorkspace.value.id);
-      workspaces.value = workspaces.value.map((w) => {
-        if (w.id === oldWorkspace.value.id) {
-          return {
-            ...w,
-            isActive: false,
-          };
-        }
-        return w;
-      });
-      if (currentWorkspace.value.id !== workspaceId) {
-          currentWorkspace.value ={
-            ...currentWorkspace.value,
-            ...workspace,
+      const oldWorkspace: Workspace | undefined = workspaces.value.find((w) => w.id === currentWorkspace.value.id);
+      
+      // Update workspaces list: set old workspace to inactive
+      if (oldWorkspace) {
+        workspaces.value = workspaces.value.map((w) => {
+          if (w.id === oldWorkspace.id) {
+            return {
+              ...w,
+              isActive: false,
+            };
           }
+          return w;
+        });
       }
-      await saveSettings();
+      
+      // Update current workspace
+      if (currentWorkspace.value.id !== workspaceId) {
+        currentWorkspace.value = {
+          ...currentWorkspace.value,
+          ...workspace,
+        };
+      }
+      
+      saveToStorage();
     } catch (err) {
       console.error('Failed to switch workspace:', err);
       throw err;
