@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Menu, Setting, Folder, Message, Document } from '@element-plus/icons-vue';
-import { ElContainer, ElHeader, ElMain } from 'element-plus';
-import { ref, onMounted } from 'vue';
+import { ElContainer, ElHeader, ElMain, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -111,7 +111,29 @@ function handleSelectRecentDirectory(command: Workspace) {
 
 onMounted(() => {
   loadRecentDirectories();
+  
+  // Listen for switch-to-terminal event from FileExplorer
+  window.addEventListener('switch-to-terminal', handleSwitchToTerminal);
 });
+
+onUnmounted(() => {
+  // Clean up event listener
+  window.removeEventListener('switch-to-terminal', handleSwitchToTerminal);
+});
+
+// Handle switching to terminal tab from FileExplorer
+function handleSwitchToTerminal(event: Event) {
+  const customEvent = event as CustomEvent;
+  activeBottomTab.value = 'terminal';
+  showBottomPanel.value = true;
+  
+  // Emit event to TerminalPanel to open terminal in the specified path
+  if (customEvent.detail?.path) {
+    window.dispatchEvent(new CustomEvent('open-terminal-in-path', {
+      detail: { path: customEvent.detail.path }
+    }));
+  }
+}
 </script>
 
 <template>

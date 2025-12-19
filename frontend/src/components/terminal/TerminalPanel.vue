@@ -19,6 +19,9 @@ const fitAddon = ref<FitAddon>();
 // Initialize terminal
 onMounted(() => {
   createNewTerminal();
+  
+  // Listen for open-terminal-in-path event
+  window.addEventListener('open-terminal-in-path', handleOpenTerminalInPath);
 });
 
 // Cleanup on unmount
@@ -26,12 +29,27 @@ onUnmounted(() => {
   terminals.value.forEach((term) => {
     term.terminal.dispose();
   });
+  
+  // Clean up event listener
+  window.removeEventListener('open-terminal-in-path', handleOpenTerminalInPath);
 });
 
+// Handle opening terminal in specific path
+function handleOpenTerminalInPath(event: Event) {
+  const customEvent = event as CustomEvent;
+  const path = customEvent.detail?.path;
+  
+  if (path) {
+    createNewTerminal(path);
+  }
+}
+
 // Create new terminal
-function createNewTerminal() {
+function createNewTerminal(workingDirectory?: string) {
   const id = `terminal-${Date.now()}`;
-  const name = `终端 ${terminals.value.length + 1}`;
+  const name = workingDirectory 
+    ? `终端 (${workingDirectory.split(/[\\/]/).pop()})`
+    : `终端 ${terminals.value.length + 1}`;
 
   // Create terminal instance
   const terminal = new Terminal({
@@ -70,24 +88,27 @@ function createNewTerminal() {
 
       // Write welcome message
       terminal.writeln('\x1b[1;32m欢迎使用 Code AI Assistant 终端\x1b[0m');
+      if (workingDirectory) {
+        terminal.writeln(`工作目录: ${workingDirectory}`);
+      }
       terminal.writeln('输入 "help" 查看可用命令');
       terminal.writeln('');
 
       // Set up command handling
-      setupCommandHandling(terminal);
+      setupCommandHandling(terminal, workingDirectory);
     }
   });
 }
 
 // Set up command handling
-function setupCommandHandling(terminal: Terminal) {
+function setupCommandHandling(terminal: Terminal, workingDirectory?: string) {
   let command = '';
 
   terminal.onData((data) => {
     if (data === '\r') {
       // Enter key
       terminal.writeln('');
-      handleCommand(command, terminal);
+      handleCommand(command, terminal, workingDirectory);
       command = '';
       terminal.write('$ ');
     } else if (data === '\u007F') {
@@ -113,7 +134,7 @@ function setupCommandHandling(terminal: Terminal) {
 }
 
 // Handle command execution
-async function handleCommand(command: string, terminal: Terminal) {
+async function handleCommand(command: string, terminal: Terminal, workingDirectory?: string) {
   const trimmedCommand = command.trim();
 
   if (!trimmedCommand) {
@@ -152,7 +173,7 @@ async function handleCommand(command: string, terminal: Terminal) {
     const result = await invoke('execute_command', {
       command: cmd,
       args,
-      cwd: '.',
+      cwd: workingDirectory || '.',
     });
 
     if (result) {

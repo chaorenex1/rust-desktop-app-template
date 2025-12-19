@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { Folder, Document, Plus, Refresh, Search, More } from '@element-plus/icons-vue';
-import { ElTree, ElInput, ElButton, ElIcon } from 'element-plus';
+import { Folder, Document, Plus, Refresh, Search, More, Edit, Delete, CopyDocument, Monitor } from '@element-plus/icons-vue';
+import { ElTree, ElInput, ElButton, ElIcon, ElMessageBox } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
 import { useAppStore } from '@/stores/appStore';
-import { showError, showWarning } from '@/utils/toast';
+import { showError, showWarning, showSuccess } from '@/utils/toast';
 
-import { listFiles, readFile, writeFile, createDirectory } from '@/services/tauri/commands';
+import { listFiles, readFile, writeFile, createDirectory, deleteFile, renameFile, deleteDirectory } from '@/services/tauri/commands';
 import type { FileItem } from '@/utils/types';
 import { getIcon } from '@/utils/fileIcons';
 
@@ -183,22 +183,132 @@ async function refreshDirectory() {
 }
 
 // Handle context menu commands
-function handleContextCommand(command: string, data: FileNode) {
+async function handleContextCommand(command: string, data: FileNode) {
   console.log('Context command:', command, data);
-  // TODO: Implement context menu actions
+  
   switch (command) {
     case 'rename':
-      // Implement rename
+      await handleRename(data);
       break;
     case 'delete':
-      // Implement delete
+      await handleDelete(data);
       break;
     case 'copy_path':
-      // Copy path to clipboard
+      await handleCopyPath(data);
       break;
     case 'open_terminal':
-      // Open terminal in directory
+      await handleOpenTerminal(data);
       break;
+  }
+}
+
+// Rename file or directory
+async function handleRename(data: FileNode) {
+  try {
+    const result = await ElMessageBox.prompt(
+      `请输入新的${data.isDirectory ? '文件夹' : '文件'}名称`,
+      '重命名',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputValue: data.name,
+        inputPattern: /^[^\\/:*?"<>|]+$/,
+        inputErrorMessage: '名称不能包含特殊字符: \\ / : * ? " < > |',
+      }
+    );
+
+    if (result.value && result.value !== data.name) {
+      const newName = result.value.trim();
+      const parentPath = data.path.substring(0, data.path.lastIndexOf('/'));
+      const newPath = `${parentPath}/${newName}`;
+      
+      await fileStore.renameFile(data.path, newName);
+      showSuccess('重命名成功');
+      await initialize(true);
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      showError(
+        error instanceof Error ? error.message : '重命名失败',
+        '重命名失败'
+      );
+    }
+  }
+}
+
+// Delete file or directory
+async function handleDelete(data: FileNode) {
+  try {
+    const confirmResult = await ElMessageBox.confirm(
+      `确定要删除 "${data.name}" 吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        buttonSize: 'default',
+      }
+    );
+
+    if (confirmResult) {
+      if (data.isDirectory) {
+        await deleteDirectory(data.path);
+      } else {
+        await fileStore.deleteFile(data.path);
+      }
+      
+      showSuccess('删除成功');
+      await initialize(true);
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      showError(
+        error instanceof Error ? error.message : '删除失败',
+        '删除失败'
+      );
+    }
+  }
+}
+
+// Copy path to clipboard
+async function handleCopyPath(data: FileNode) {
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(data.path);
+      showSuccess('路径已复制到剪贴板');
+    } else {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = data.path;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      showSuccess('路径已复制到剪贴板');
+    }
+  } catch (error) {
+    showError('复制路径失败', '复制失败');
+  }
+}
+
+// Open terminal in directory
+async function handleOpenTerminal(data: FileNode) {
+  try {
+    if (!data.isDirectory) {
+      showWarning('只能在文件夹中打开终端');
+      return;
+    }
+    
+    // Emit custom event to notify MainLayout to switch to terminal tab
+    window.dispatchEvent(new CustomEvent('switch-to-terminal', {
+      detail: { path: data.path }
+    }));
+    
+    showSuccess(`已在 "${data.name}" 打开终端`);
+  } catch (error) {
+    showError('打开终端失败', '操作失败');
   }
 }
 </script>
@@ -249,11 +359,7 @@ function handleContextCommand(command: string, data: FileNode) {
         :indent="20"
       >
         <template #default="{ data }">
-          <div class="flex items-center px-1 py-1">
-            <!-- <ElIcon :size="16" class="mr-2">
-              <Folder v-if="data.isDirectory" />
-              <Document v-else />
-            </ElIcon> -->
+          <div class="tree-node-content flex items-center px-1 py-1 w-full">
             <span
               class="mr-2 text-base leading-none flex-shrink-0"
               :style="{ color: data.icon.color }"
@@ -261,22 +367,32 @@ function handleContextCommand(command: string, data: FileNode) {
               {{ data.icon.icon }}
             </span>
             <span class="flex-1 truncate">{{ data.name }}</span>
-            <div class="opacity-0 group-hover:opacity-100">
+            <div class="context-menu-trigger">
               <ElDropdown
                 trigger="click"
                 @command="(command) => handleContextCommand(command, data)"
               >
-                <span class="el-dropdown-link">
-                  <ElIcon :size="14"><More /></ElIcon>
+                <span class="el-dropdown-link context-menu-btn">
+                  <ElIcon :size="16"><More /></ElIcon>
                 </span>
                 <template #dropdown>
                   <ElDropdownMenu>
-                    <ElDropdownItem command="rename">重命名</ElDropdownItem>
-                    <ElDropdownItem command="delete" divided>删除</ElDropdownItem>
-                    <ElDropdownItem command="copy_path">复制路径</ElDropdownItem>
-                    <ElDropdownItem command="open_terminal" v-if="data.isDirectory"
-                      >在终端打开</ElDropdownItem
-                    >
+                    <ElDropdownItem command="rename">
+                      <ElIcon class="mr-2"><Edit /></ElIcon>
+                      重命名
+                    </ElDropdownItem>
+                    <ElDropdownItem command="copy_path">
+                      <ElIcon class="mr-2"><CopyDocument /></ElIcon>
+                      复制路径
+                    </ElDropdownItem>
+                    <ElDropdownItem command="open_terminal" v-if="data.isDirectory">
+                      <ElIcon class="mr-2"><Monitor /></ElIcon>
+                      在终端打开
+                    </ElDropdownItem>
+                    <ElDropdownItem command="delete" divided>
+                      <ElIcon class="mr-2"><Delete /></ElIcon>
+                      <span class="text-red-500">删除</span>
+                    </ElDropdownItem>
                   </ElDropdownMenu>
                 </template>
               </ElDropdown>
@@ -302,6 +418,7 @@ function handleContextCommand(command: string, data: FileNode) {
 
 :deep(.el-tree-node__content) {
   height: 32px;
+  position: relative;
 }
 
 :deep(.el-tree-node__content:hover) {
@@ -315,5 +432,47 @@ function handleContextCommand(command: string, data: FileNode) {
 
 :deep(.el-tree-node__children) {
   overflow: visible;
+}
+
+/* Context menu styling */
+.tree-node-content {
+  position: relative;
+}
+
+.context-menu-trigger {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-left: 8px;
+}
+
+.tree-node-content:hover .context-menu-trigger {
+  opacity: 1;
+}
+
+.context-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all 0.2s ease;
+}
+
+.context-menu-btn:hover {
+  background-color: var(--el-fill-color-light);
+  color: var(--color-text);
+}
+
+/* Dropdown menu styling */
+:deep(.el-dropdown-menu__item) {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+}
+
+:deep(.el-dropdown-menu__item .el-icon) {
+  font-size: 14px;
 }
 </style>
