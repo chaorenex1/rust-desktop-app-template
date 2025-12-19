@@ -65,7 +65,7 @@ export const useFileStore = defineStore('files', () => {
   async function openFile(path: string) {
     try {
       error.value = null;
-
+      console.debug('Opening file:', path);
       // Check if file is already opened
       const existingIndex = openedFiles.value.findIndex((file) => file.path === path);
       if (existingIndex >= 0) {
@@ -86,7 +86,7 @@ export const useFileStore = defineStore('files', () => {
 
       openedFiles.value.push(fileContent);
       activeFileIndex.value = openedFiles.value.length - 1;
-
+      console.debug('Opened file:', fileContent);
       return fileContent;
     } catch (err) {
       error.value = err instanceof Error ? err.message : '打开文件失败';

@@ -33,6 +33,7 @@ interface FileNode {
 
 const treeData = ref<FileNode[]>([]);
 const rootDirectory = ref<FileNode | null>(null);
+const isLoading = ref(false);
 
 
 const defaultProps = {
@@ -101,22 +102,23 @@ async function initialize(refresh: boolean = false) {
 // 懒加载子目录（根节点完全由 treeData 提供）
 async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
   const data = node.data as FileNode | undefined;
-  console.debug('Loading node:', { 
-    nodePath: data?.path, 
-    isDirectory: data?.isDirectory,
+  
+  // Element Plus 初始化时可能调用 loadNode，此时 node.data 为 undefined
+  // 根节点数据由 :data="treeData" 提供，无需在这里加载，直接返回即可
+  if (!data) {
+    return resolve([]);
+  }
+
+  // 非目录节点（文件）不需要加载子节点，也不触发任何日志
+  if (!data.isDirectory) {
+    return resolve([]);
+  }
+
+  // 只有目录节点才会执行到这里
+  console.debug('Loading directory node:', { 
+    nodePath: data.path, 
     level: node.level 
   });
-
-  // 根节点使用 :data="treeData"，这里不再处理
-  if (!data) {
-    console.debug('No data, returning empty');
-    return resolve([]);
-  }
-
-  if (!data.isDirectory) {
-    console.debug('Not a directory, returning empty');
-    return resolve([]);
-  }
 
   try {
     const fileList = await listFiles(data.path);
@@ -156,14 +158,17 @@ watch(searchQuery, (val) => {
 
 // 处理节点点击：目录展开/收起，文件在编辑器打开
 async function handleNodeClick(data: FileNode, node: any) {
-  console.debug('Node clicked:', data);
   if (data.isDirectory) {
     node.expanded = !node.expanded;
   } else {
     try {
       // 显示加载状态
-      fileStore.isLoading = true;
-      await fileStore.openFile(data.path);
+      if (!isLoading.value) {
+        isLoading.value = true;
+        await fileStore.openFile(data.path);
+      }else{
+        showWarning('文件正在打开中，请稍后再试');
+      }
     } catch (error) {
       showError(
         (error instanceof Error && error.message) || '打开文件失败（可能不是文本文件或编码不兼容）',
@@ -171,7 +176,7 @@ async function handleNodeClick(data: FileNode, node: any) {
       );
     } finally {
       // 确保加载状态被清除
-      fileStore.isLoading = false;
+      isLoading.value = false;
     }
   }
 }
