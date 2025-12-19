@@ -30,7 +30,7 @@
       }
     ],
     "security": {
-      "csp": null,
+      "csp": "default-src 'self' 'https://cdn.jsdelivr.net' 'unsafe-inline' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; media-src 'self' data:; object-src 'none'; frame-src 'none'; worker-src 'self' blob:;",
       "capabilities": ["default"],
       "assetProtocol": {
         "enable": true,
