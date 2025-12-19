@@ -22,16 +22,41 @@ pub struct FileEntry {
     pub modified: Option<String>,
 }
 
-/// Read file content
-#[tauri::command]
-pub async fn read_file(path: String) -> Result<String, String> {
-    info!("Reading file: {}", path);
-    fs::read_to_string(&path).map_err(|e| e.to_string())
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileContent {
+    pub name: String,
+    pub path: String,
+    pub content: String,
+    pub modified: bool,
+    pub line_count: usize,
+    pub size: u64,
 }
 
 /// Read file content
 #[tauri::command]
-pub async fn read_max_file(path: String) -> Result<String, String> {
+pub async fn read_file(path: String) -> Result<FileContent, String> {
+    info!("Reading file: {}", path);
+    let metadata = fs::metadata(&path).map_err(|e| {
+        error!("Failed to stat file {}: {:?}", path, e);
+        e.to_string()
+    })?;
+    let content = fs::read_to_string(&path).map_err(|e| {
+        error!("Failed to read file {}: {:?}", path, e);
+        e.to_string()
+    })?;
+    Ok(FileContent {
+        name: path.split('/').last().unwrap_or_default().to_string(),
+        path,
+        content,
+        modified: false,
+        line_count:0,
+        size: metadata.len(),
+    })
+}
+
+/// Read file content
+#[tauri::command]
+pub async fn read_max_file(path: String) -> Result<FileContent, String> {
     info!("Reading file: {}", path);
     // 先检查元数据，避免将目录或超大文件直接读入内存导致应用卡死
     let metadata = fs::metadata(&path).map_err(|e| {
@@ -63,7 +88,14 @@ pub async fn read_max_file(path: String) -> Result<String, String> {
         })?;
 
     let content = String::from_utf8_lossy(&bytes).to_string();
-    Ok(content)
+    Ok(FileContent {
+        name: path.split('/').last().unwrap_or_default().to_string(),
+        path,
+        content,
+        modified: false,
+        line_count: 0,
+        size: metadata.len(),
+    })
 }
 
 
@@ -95,7 +127,7 @@ pub async fn list_files(path: String) -> Result<Vec<FileEntry>, String> {
 
             files.push(FileEntry {
                 name: entry.file_name().to_string_lossy().to_string(),
-                path: path_buf.to_string_lossy().to_string(),
+                path: crate::utils::fs::normalize_path(&path_buf.to_string_lossy().to_string()),
                 is_directory: metadata.is_dir(),
                 size: metadata.len(),
                 modified: metadata.modified().ok().map(|t| {

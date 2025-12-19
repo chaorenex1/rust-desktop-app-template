@@ -7,10 +7,11 @@ import type {
   Workspace,
   CommandResult,
   ApiResponse,
+  FileContent,
 } from '@/utils/types';
 
 // File system commands
-export async function readFile(path: string): Promise<string> {
+export async function readFile(path: string): Promise<FileContent> {
   return invoke('read_file', { path });
 }
 
@@ -19,7 +20,21 @@ export async function writeFile(path: string, content: string): Promise<void> {
 }
 
 export async function listFiles(path: string): Promise<FileItem[]> {
-  return invoke('list_files', { path });
+  const fileList = await invoke<Array<{
+    name: string;
+    path: string;
+    is_directory: boolean;
+    size: number;
+    modified?: string;
+  }>>('list_files', { path });
+  
+  return fileList.map((file) => ({
+    name: file.name,
+    path: file.path,
+    isDirectory: file.is_directory,
+    size: file.size,
+    modified: file.modified,
+  }));
 }
 
 export async function createFile(path: string): Promise<void> {

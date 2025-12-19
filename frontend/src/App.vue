@@ -2,12 +2,20 @@
 import { ref, onMounted } from 'vue';
 import { ElNotification } from 'element-plus';
 import { useAppStore, useThemeStore } from '@/stores';
+import { ErrorContainer } from '@/components/error';
+import { setToastContainer, showSuccess, showError } from '@/utils/toast';
 
 const appStore = useAppStore();
 const themeStore = useThemeStore();
 const isLoading = ref(true);
+const toastContainerRef = ref<InstanceType<typeof ErrorContainer> | null>(null);
 
 onMounted(async () => {
+  // 初始化 toast 容器
+  if (toastContainerRef.value) {
+    setToastContainer(toastContainerRef.value);
+  }
+
   try {
     // Initialize application
     await appStore.initialize();
@@ -17,20 +25,14 @@ onMounted(async () => {
     // Listen to Tauri events
     // await setupEventListeners();
 
-    ElNotification({
-      title: '应用启动成功',
-      message: 'Code AI Assistant 已准备就绪',
-      type: 'success',
-      duration: 3000,
-    });
+    showSuccess('Code AI Assistant 已准备就绪', '应用启动成功');
   } catch (error) {
     console.error('Failed to initialize app:', error);
-    ElNotification({
-      title: '应用启动失败',
-      message: error instanceof Error ? error.message : '未知错误',
-      type: 'error',
-      duration: 5000,
-    });
+    showError(
+      error instanceof Error ? error.message : '未知错误',
+      '应用启动失败',
+      5000
+    );
   } finally {
     // Always show the layout even if initialization fails
     isLoading.value = false;
@@ -115,6 +117,9 @@ onMounted(async () => {
     </div>
 
     <router-view v-else />
+
+    <!-- 全局错误提示容器 -->
+    <ErrorContainer ref="toastContainerRef" />
   </div>
 </template>
 

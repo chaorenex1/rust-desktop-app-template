@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue';
 import { ElInput, ElButton, ElSelect, ElOption, ElTooltip } from 'element-plus';
+import { showConfirm } from '@/utils/toast';
 
 const logs = ref<string[]>([
   '2024-01-15 10:30:25 INFO - 应用启动成功',
@@ -40,9 +41,12 @@ const filteredLogs = computed(() => {
 
 // Clear logs
 function clearLogs() {
-  if (confirm('确定要清空所有日志吗？')) {
-    logs.value = [];
-  }
+  showConfirm(
+    '确定要清空所有日志吗？',
+    () => {
+      logs.value = [];
+    }
+  );
 }
 
 // Toggle pause

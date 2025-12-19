@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { Menu, Setting, Folder, Message, Document } from '@element-plus/icons-vue';
-import { ElContainer, ElHeader, ElMain, ElMessage } from 'element-plus';
+import { ElContainer, ElHeader, ElMain } from 'element-plus';
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { showError, showSuccess } from '@/utils/toast';
 
-import { useFileStore } from '@/stores/filesStore';
-import { addRecentDirectory, getRecentDirectories, type RecentDirectory } from '@/services/tauri/commands';
+import { useAppStore, useFileStore } from '@/stores';
 import MainSidebar from '@/components/layout/MainSidebar.vue';
 import EditorArea from '@/components/layout/EditorArea.vue';
 import BottomTabs from '@/components/layout/BottomTabs.vue';
+import type { Workspace } from '@/utils/types';
 
+const appStore = useAppStore();
 const fileStore = useFileStore();
 const router = useRouter();
 
@@ -30,7 +32,7 @@ const bottomTabs = [
 const activeBottomTab = ref('chat');
 
 // Recent directories
-const recentDirectories = ref<RecentDirectory[]>([]);
+const recentDirectories = ref<Workspace[]>([]);
 
 // Toggle panels
 function toggleFileExplorer() {
@@ -77,8 +79,7 @@ function openSettings() {
 // Load recent directories from backend
 async function loadRecentDirectories() {
   try {
-    const directories = await getRecentDirectories();
-    recentDirectories.value = directories;
+    recentDirectories.value = appStore.workspaces;
   } catch (error) {
     console.error('加载最近目录失败', error);
     recentDirectories.value = [];
@@ -86,18 +87,26 @@ async function loadRecentDirectories() {
 }
 
 // Open a recent directory from header dropdown
-async function openRecentDirectoryFromHeader(dir: RecentDirectory) {
+async function openRecentDirectoryFromHeader(dir: Workspace) {
   try {
+    // 先设置根目录
+    fileStore.setRootDirectory(dir.path);
+    // 加载目录内容，这会触发 FileExplorer 的 watch 更新
     await fileStore.loadDirectory(dir.path);
-    await addRecentDirectory(dir.path);
-    router.push('/dashboard');
+    // 切换工作区
+    await appStore.switchWorkspace(dir.id);
+    
+    showSuccess(`已切换到工作区: ${dir.name}`);
   } catch (error) {
-    ElMessage.error('打开目录失败: ' + (error as Error).message);
+    showError(
+      (error as Error).message || '打开目录失败',
+      '打开目录失败'
+    );
     console.error('打开目录失败', error);
   }
 }
 
-function handleSelectRecentDirectory(command: RecentDirectory) {
+function handleSelectRecentDirectory(command: Workspace) {
   if (command && command.path) {
     openRecentDirectoryFromHeader(command);
   }
@@ -159,7 +168,7 @@ onMounted(() => {
                     {{ dir.path }}
                   </div>
                   <div class="recent-dir-time">
-                    {{ new Date(dir.openedAt).toLocaleString('zh-CN') }}
+                    {{ new Date(dir.createdAt).toLocaleString('zh-CN') }}
                   </div>
                 </div>
               </ElDropdownItem>

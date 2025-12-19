@@ -1,9 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
-import Dashboard from '../pages/Dashboard/index.vue';
-import Home from '../pages/Home/index.vue';
-import Login from '../pages/Login/index.vue';
-import Settings from '../pages/Settings/index.vue';
+import Dashboard from '@/pages/Dashboard/index.vue';
+import Home from '@/pages/Home/index.vue';
+import Login from '@/pages/Login/index.vue';
+import Settings from '@/pages/Settings/index.vue';
 // import CliPaths from '../pages/Settings/CliPaths.vue';
 // import Environment from '../pages/Settings/Environment.vue';
 // import AiModels from '../pages/Settings/AiModels.vue';

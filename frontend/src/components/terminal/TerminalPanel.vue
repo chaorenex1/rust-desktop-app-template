@@ -8,6 +8,7 @@ import '@xterm/xterm/css/xterm.css';
 import { Plus, Close, Refresh } from '@element-plus/icons-vue';
 import { ElTabs, ElTabPane, ElButton, ElSelect, ElOption } from 'element-plus';
 import { useAppStore } from '../../stores/appStore';
+import { showError } from '@/utils/toast';
 
 const appStore = useAppStore();
 const terminalContainer = ref<HTMLElement>();
@@ -159,6 +160,10 @@ async function handleCommand(command: string, terminal: Terminal) {
     }
   } catch (error) {
     terminal.writeln(`\x1b[1;31m错误: ${error}\x1b[0m`);
+    showError(
+      error instanceof Error ? error.message : '命令执行失败',
+      '终端错误'
+    );
   }
 
   terminal.write('$ ');

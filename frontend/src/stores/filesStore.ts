@@ -8,6 +8,8 @@ import {
   writeFile,
   createDirectory
 } from '@/services/tauri/commands';
+import { getFileIcon } from '@/utils/helpers';
+
 
 
 export const useFileStore = defineStore('files', () => {
@@ -16,6 +18,7 @@ export const useFileStore = defineStore('files', () => {
   const rootDirectory = ref<string>('.');
   const files = ref<FileItem[]>([]);
   const openedFiles = ref<FileContent[]>([]);
+  const currentFile = ref<FileItem | null>(null);
   const activeFileIndex = ref<number>(-1);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -46,21 +49,9 @@ export const useFileStore = defineStore('files', () => {
         activeFileIndex.value = -1;
       }
       console.debug('Loading directory:', targetPath);
-      const fileList = (await listFiles(targetPath)) as Array<{
-        name: string;
-        path: string;
-        is_directory: boolean;
-        size: number;
-        modified?: string;
-      }>;
 
-      files.value = fileList.map((file) => ({
-        name: file.name,
-        path: file.path,
-        isDirectory: file.is_directory,
-        size: file.size,
-        modified: file.modified,
-      }));
+      files.value = await listFiles(targetPath)
+      console.debug('File list mapped:', files.value);
 
       currentDirectory.value = targetPath;
     } catch (err) {
@@ -82,15 +73,16 @@ export const useFileStore = defineStore('files', () => {
         return openedFiles.value[existingIndex];
       }
       const fileItem = files.value.find((file) => file.path === path);
-      content = await readFile(path);
-
-      const fileContent: FileContent = {
-        name: fileItem?.name || '',
-        path: fileItem?.path || '',
-        content,
-        language: getFileIcon(fileItem),
-        modified: false,
-      };
+      if (!fileItem) {
+        error.value = `文件未找到: ${path}`;
+        throw error;
+      }
+      
+      currentFile.value = fileItem;
+      
+      const fileContent = await readFile(path);
+      fileContent.language = getFileIcon(fileItem);
+      fileContent.size = fileItem.size || 0;
 
       openedFiles.value.push(fileContent);
       activeFileIndex.value = openedFiles.value.length - 1;
@@ -213,6 +205,7 @@ export const useFileStore = defineStore('files', () => {
     content: existing.content,
     language: existing.language,
     modified: existing.modified,
+
   };
   }
 
@@ -289,6 +282,7 @@ export const useFileStore = defineStore('files', () => {
     currentDirectory,
     files,
     openedFiles,
+    currentFile,
     activeFileIndex,
     isLoading,
     error,

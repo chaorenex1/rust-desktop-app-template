@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Folder, Document, Plus, Refresh, Search } from '@element-plus/icons-vue';
-import { ElTree, ElInput, ElButton, ElIcon, ElMessage } from 'element-plus';
+import { ElTree, ElInput, ElButton, ElIcon } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
 import { useAppStore } from '@/stores/appStore';
+import { showError } from '@/utils/toast';
 
 import {
   listFiles,
@@ -13,6 +14,7 @@ import {
 } from '@/services/tauri/commands';
 import { f } from 'vue-router/dist/router-CWoNjPRp.mjs';
 import { da } from 'element-plus/es/locales.mjs';
+import type { FileItem } from '@/utils/types';
 
 const fileStore = useFileStore();
 const appStore = useAppStore();
@@ -61,6 +63,17 @@ watch(
   { deep: true }
 );
 
+// 监听根目录变化，重新初始化
+watch(
+  () => fileStore.currentDirectory,
+  async (newDir, oldDir) => {
+    if (newDir !== oldDir) {
+      console.debug('Root directory changed, reinitializing...', { newDir, oldDir });
+      await initialize(true);
+    }
+  }
+);
+
 async function initialize(refresh: boolean = false) {
   if (!fileStore.files.length || refresh) {
     await fileStore.loadDirectory(fileStore.getRootDirectory());
@@ -88,29 +101,41 @@ async function initialize(refresh: boolean = false) {
 // 懒加载子目录（根节点完全由 treeData 提供）
 async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
   const data = node.data as FileNode | undefined;
-  console.debug('Loading node:', data);
+  console.debug('Loading node:', { 
+    nodePath: data?.path, 
+    isDirectory: data?.isDirectory,
+    level: node.level 
+  });
 
   // 根节点使用 :data="treeData"，这里不再处理
   if (!data) {
+    console.debug('No data, returning empty');
     return resolve([]);
   }
 
   if (!data.isDirectory) {
+    console.debug('Not a directory, returning empty');
     return resolve([]);
   }
 
   try {
     const fileList = await listFiles(data.path);
+    console.debug(`Loaded ${fileList.length} items from ${data.path}`);
 
     const children: FileNode[] = fileList.map((file) => ({
       name: file.name,
       path: file.path,
-      isDirectory: file.is_directory,
+      isDirectory: file.isDirectory,
       size: file.size,
       modified: file.modified,
-      isLeaf: !file.is_directory,
+      isLeaf: !file.isDirectory,
     }));
-    console.debug('node list:', fileList);
+    
+    console.debug('Children nodes:', children.map(c => ({ 
+      name: c.name, 
+      isDirectory: c.isDirectory,
+      isLeaf: c.isLeaf 
+    })));
 
     resolve(children);
   } catch (error) {
@@ -140,9 +165,9 @@ async function handleNodeClick(data: FileNode, node: any) {
       fileStore.isLoading = true;
       await fileStore.openFile(data.path);
     } catch (error) {
-      console.error('打开文件失败', error);
-      ElMessage.error(
-        (error instanceof Error && error.message) || '打开文件失败（可能不是文本文件或编码不兼容）'
+      showError(
+        (error instanceof Error && error.message) || '打开文件失败（可能不是文本文件或编码不兼容）',
+        '打开文件失败'
       );
     } finally {
       // 确保加载状态被清除
@@ -237,6 +262,7 @@ async function refreshDirectory() {
         :load="loadNode"
         :filter-node-method="filterNode"
         @node-click="handleNodeClick"
+        :indent="20"
       >
         <template #default="{ data }">
           <div class="flex items-center px-1 py-1">
@@ -276,5 +302,14 @@ async function refreshDirectory() {
 
 :deep(.el-tree-node__content:hover) {
   background-color: var(--color-surface);
+}
+
+:deep(.el-tree-node__expand-icon) {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+:deep(.el-tree-node__children) {
+  overflow: visible;
 }
 </style>

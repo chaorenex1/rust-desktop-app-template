@@ -5,7 +5,7 @@ import { computed } from 'vue';
 import ChatPanel from '@/components/chat/ChatPanel.vue';
 import OutputPanel from '@/components/output/OutputPanel.vue';
 import TerminalPanel from '@/components/terminal/TerminalPanel.vue';
-import { useAppStore } from '@/stores/appStore';
+import { useAppStore, useFileStore } from '@/stores';
 
 interface BottomTab {
   key: string;
@@ -28,6 +28,7 @@ const emit = defineEmits<{
 }>();
 
 const appStore = useAppStore();
+const fileStore = useFileStore();
 
 const FOOTER_HEIGHT = 32;
 
@@ -97,9 +98,9 @@ function onSelectTab(key: string) {
     <div class="border-t border-border bg-surface px-4 py-2 text-sm text-text-secondary footer-bar">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
-          <span>工作区: {{ appStore.currentWorkspace }}</span>
+          <span>工作区: {{ appStore.currentWorkspace.name }}</span>
           <span>|</span>
-          <span>文件: {{ appStore.currentFile || '未选择文件' }}</span>
+          <span>文件: {{ fileStore.currentFile?.path || '未选择文件' }}</span>
         </div>
 
         <div class="flex items-center space-x-4">

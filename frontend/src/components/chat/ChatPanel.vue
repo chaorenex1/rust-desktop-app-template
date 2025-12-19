@@ -4,6 +4,7 @@ import { Link, Delete, Setting } from '@element-plus/icons-vue';
 import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElTag } from 'element-plus';
 import { useAppStore } from '../../stores/appStore';
 import { useFileStore } from '../../stores/filesStore';
+import { showError, showConfirm } from '@/utils/toast';
 
 const appStore = useAppStore();
 const fileStore = useFileStore();
@@ -26,7 +27,10 @@ async function sendMessage() {
     // Clear message
     message.value = '';
   } catch (error) {
-    console.error('Failed to send message:', error);
+    showError(
+      error instanceof Error ? error.message : '发送消息失败',
+      '发送失败'
+    );
   } finally {
     isLoading.value = false;
   }
@@ -34,9 +38,12 @@ async function sendMessage() {
 
 // Clear chat
 function clearChat() {
-  if (confirm('确定要清空聊天记录吗？')) {
-    // TODO: Clear chat history
-  }
+  showConfirm(
+    '确定要清空聊天记录吗？',
+    () => {
+      // TODO: Clear chat history
+    }
+  );
 }
 
 // Associate file

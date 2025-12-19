@@ -14,6 +14,7 @@ import {
   ElDialog,
 } from 'element-plus';
 import { useAppStore } from '../../stores/appStore';
+import { showError, showConfirm } from '@/utils/toast';
 
 const appStore = useAppStore();
 
@@ -61,24 +62,33 @@ async function saveSettings() {
     await appStore.saveSettings();
     // TODO: Save other settings
   } catch (error) {
-    console.error('Failed to save settings:', error);
+    showError(
+      error instanceof Error ? error.message : '保存设置失败',
+      '保存失败'
+    );
   }
 }
 
 // Reset to defaults
 async function resetSettings() {
-  if (confirm('确定要重置所有设置为默认值吗？')) {
-    try {
-      // Reset to default settings
-      appStore.settings.theme = 'light';
-      appStore.settings.fontSize = 14;
-      appStore.settings.autoSave = true;
-      await appStore.saveSettings();
-      // TODO: Reset other settings
-    } catch (error) {
-      console.error('Failed to reset settings:', error);
+  showConfirm(
+    '确定要重置所有设置为默认值吗？',
+    async () => {
+      try {
+        // Reset to default settings
+        appStore.settings.theme = 'light';
+        appStore.settings.fontSize = 14;
+        appStore.settings.autoSave = true;
+        await appStore.saveSettings();
+        // TODO: Reset other settings
+      } catch (error) {
+        showError(
+          error instanceof Error ? error.message : '重置设置失败',
+          '重置失败'
+        );
+      }
     }
-  }
+  );
 }
 
 // Workspace operations
@@ -88,19 +98,28 @@ async function createWorkspace() {
       await appStore.createWorkspace(workspaceName.value.trim());
       workspaceName.value = '';
     } catch (error) {
-      console.error('Failed to create workspace:', error);
+      showError(
+        error instanceof Error ? error.message : '创建工作区失败',
+        '创建失败'
+      );
     }
   }
 }
 
 async function deleteWorkspace(name: string) {
-  if (confirm(`确定要删除工作区 "${name}" 吗？`)) {
-    try {
-      await appStore.deleteWorkspace(name);
-    } catch (error) {
-      console.error('Failed to delete workspace:', error);
+  showConfirm(
+    `确定要删除工作区 "${name}" 吗？`,
+    async () => {
+      try {
+        await appStore.deleteWorkspace(name);
+      } catch (error) {
+        showError(
+          error instanceof Error ? error.message : '删除工作区失败',
+          '删除失败'
+        );
+      }
     }
-  }
+  );
 }
 
 // Environment variable operations

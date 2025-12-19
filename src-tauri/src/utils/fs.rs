@@ -23,3 +23,8 @@ pub fn init_dir(dir: &str) -> Result<(), std::io::Error> {
 
     Ok(())
 }
+
+// 统一路径分隔符
+pub fn normalize_path(path: &str) -> String {
+    path.replace(std::path::MAIN_SEPARATOR, "/")
+}
