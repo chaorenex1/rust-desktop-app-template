@@ -27,10 +27,7 @@ async function sendMessage() {
     // Clear message
     message.value = '';
   } catch (error) {
-    showError(
-      error instanceof Error ? error.message : '发送消息失败',
-      '发送失败'
-    );
+    showError(error instanceof Error ? error.message : '发送消息失败', '发送失败');
   } finally {
     isLoading.value = false;
   }
@@ -38,12 +35,9 @@ async function sendMessage() {
 
 // Clear chat
 function clearChat() {
-  showConfirm(
-    '确定要清空聊天记录吗？',
-    () => {
-      // TODO: Clear chat history
-    }
-  );
+  showConfirm('确定要清空聊天记录吗？', () => {
+    // TODO: Clear chat history
+  });
 }
 
 // Associate file

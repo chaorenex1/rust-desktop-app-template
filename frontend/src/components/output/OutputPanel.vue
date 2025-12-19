@@ -41,12 +41,9 @@ const filteredLogs = computed(() => {
 
 // Clear logs
 function clearLogs() {
-  showConfirm(
-    '确定要清空所有日志吗？',
-    () => {
-      logs.value = [];
-    }
-  );
+  showConfirm('确定要清空所有日志吗？', () => {
+    logs.value = [];
+  });
 }
 
 // Toggle pause

@@ -95,13 +95,10 @@ async function openRecentDirectoryFromHeader(dir: Workspace) {
     await fileStore.loadDirectory(dir.path);
     // 切换工作区
     await appStore.switchWorkspace(dir.id);
-    
+
     showSuccess(`已切换到工作区: ${dir.name}`);
   } catch (error) {
-    showError(
-      (error as Error).message || '打开目录失败',
-      '打开目录失败'
-    );
+    showError((error as Error).message || '打开目录失败', '打开目录失败');
     console.error('打开目录失败', error);
   }
 }
@@ -123,20 +120,12 @@ onMounted(() => {
     <ElHeader class="flex items-center justify-between border-b border-border bg-surface px-4">
       <div class="flex items-center space-x-4">
         <div class="flex items-center space-x-2">
-          <img
-            src="/vite.svg"
-            class="h-8 w-8"
-            alt="Logo"
-          >
+          <img src="/vite.svg" class="h-8 w-8" alt="Logo" />
           <span class="text-lg font-semibold">Code AI Assistant</span>
         </div>
 
         <div class="flex items-center space-x-2">
-          <el-button
-            :icon="Menu"
-            text
-            @click="toggleFileExplorer"
-          >
+          <el-button :icon="Menu" text @click="toggleFileExplorer">
             {{ showFileExplorer ? '隐藏导航' : '显示导航' }}
           </el-button>
         </div>
@@ -152,17 +141,11 @@ onMounted(() => {
             <el-icon class="mr-1">
               <Folder />
             </el-icon>
-            <span class="recent-dropdown-label">
-              最近目录
-            </span>
+            <span class="recent-dropdown-label"> 最近目录 </span>
           </span>
           <template #dropdown>
             <ElDropdownMenu class="recent-dropdown-menu">
-              <ElDropdownItem
-                v-for="dir in recentDirectories"
-                :key="dir.path"
-                :command="dir"
-              >
+              <ElDropdownItem v-for="dir in recentDirectories" :key="dir.path" :command="dir">
                 <div class="recent-dir-item">
                   <div class="recent-dir-path">
                     {{ dir.path }}
@@ -177,15 +160,8 @@ onMounted(() => {
         </ElDropdown>
 
         <el-button-group>
-          <el-button
-            type="primary"
-            disabled
-          >
-            编辑器
-          </el-button>
-          <el-button
-            @click="openSettings"
-          >
+          <el-button type="primary" disabled> 编辑器 </el-button>
+          <el-button @click="openSettings">
             <el-icon><Setting /></el-icon>
             设置
           </el-button>
@@ -195,18 +171,12 @@ onMounted(() => {
 
     <!-- Main Content -->
     <ElContainer class="flex-1">
-      <MainSidebar
-        :visible="showFileExplorer"
-        :width="sidebarWidth"
-      />
+      <MainSidebar :visible="showFileExplorer" :width="sidebarWidth" />
 
       <!-- Main Content Area -->
       <ElMain class="flex-1 overflow-hidden min-w-0">
         <!-- Editor View -->
-        <div
-          class="h-full flex flex-col"
-          :style="{ paddingBottom: bottomPanelHeight + 32 + 'px' }"
-        >
+        <div class="h-full flex flex-col" :style="{ paddingBottom: bottomPanelHeight + 32 + 'px' }">
           <!-- Editor Area -->
           <EditorArea />
 
@@ -221,10 +191,8 @@ onMounted(() => {
             @update:visible="showBottomPanel = $event"
           />
         </div>
-
       </ElMain>
     </ElContainer>
-
   </ElContainer>
 </template>
 

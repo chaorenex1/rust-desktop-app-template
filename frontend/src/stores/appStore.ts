@@ -10,7 +10,7 @@ import {
   getWorkspaces,
   deleteWorkspace as deleteWorkspaceCommand,
   createWorkspace as createWorkspaceCommand,
-  switchWorkspace as switchWorkspaceCommand
+  switchWorkspace as switchWorkspaceCommand,
 } from '@/services/tauri/commands';
 import { de } from 'element-plus/es/locales.mjs';
 // import {} from '@/services/tauri/events';
@@ -139,8 +139,10 @@ export const useAppStore = defineStore('app', () => {
   async function switchWorkspace(workspaceId: string) {
     try {
       const workspace: Workspace = await switchWorkspaceCommand(workspaceId);
-      const oldWorkspace: Workspace | undefined = workspaces.value.find((w) => w.id === currentWorkspace.value.id);
-      
+      const oldWorkspace: Workspace | undefined = workspaces.value.find(
+        (w) => w.id === currentWorkspace.value.id
+      );
+
       // Update workspaces list: set old workspace to inactive
       if (oldWorkspace) {
         workspaces.value = workspaces.value.map((w) => {
@@ -153,7 +155,7 @@ export const useAppStore = defineStore('app', () => {
           return w;
         });
       }
-      
+
       // Update current workspace
       if (currentWorkspace.value.id !== workspaceId) {
         currentWorkspace.value = {
@@ -161,7 +163,7 @@ export const useAppStore = defineStore('app', () => {
           ...workspace,
         };
       }
-      
+
       saveToStorage();
     } catch (err) {
       console.error('Failed to switch workspace:', err);
@@ -169,15 +171,15 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  async function createWorkspace(path: string,isActive:boolean) {
+  async function createWorkspace(path: string, isActive: boolean) {
     try {
       // Generate a name for the workspace
       let name = path.split('/').pop() || '';
-      if (name === path){
+      if (name === path) {
         name = path.split('\\').pop() || '';
       }
       console.debug('Creating workspace with name:', name);
-      const newWorkspace: Workspace =await createWorkspaceCommand(name, path,isActive);
+      const newWorkspace: Workspace = await createWorkspaceCommand(name, path, isActive);
       workspaces.value.push(newWorkspace);
       currentWorkspace.value = newWorkspace;
       saveToStorage();
@@ -194,9 +196,9 @@ export const useAppStore = defineStore('app', () => {
       workspaces.value = workspaces.value.filter((w) => w.id !== workspaceId);
 
       if (currentWorkspace.value.id === workspaceId) {
-          currentWorkspace.value = {
-            ...currentWorkspace.value,
-          }
+        currentWorkspace.value = {
+          ...currentWorkspace.value,
+        };
       }
       saveToStorage();
     } catch (err) {

@@ -56,10 +56,7 @@ function onSelectTab(key: string) {
 <template>
   <div>
     <!-- Bottom Panel Toggle -->
-    <div
-      class="border-t border-border bg-surface px-4 py-1 toggle-bar"
-      :style="toggleBarStyle"
-    >
+    <div class="border-t border-border bg-surface px-4 py-1 toggle-bar" :style="toggleBarStyle">
       <div class="flex items-center justify-between">
         <ElButtonGroup>
           <ElButton
@@ -73,11 +70,7 @@ function onSelectTab(key: string) {
           </ElButton>
         </ElButtonGroup>
 
-        <ElButton
-          :icon="props.visible ? 'ArrowDown' : 'ArrowUp'"
-          text
-          @click="onToggleVisible"
-        >
+        <ElButton :icon="props.visible ? 'ArrowDown' : 'ArrowUp'" text @click="onToggleVisible">
           {{ props.visible ? '隐藏面板' : '显示面板' }}
         </ElButton>
       </div>

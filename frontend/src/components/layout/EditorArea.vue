@@ -8,5 +8,4 @@ import CodeEditor from '@/components/editor/CodeEditor.vue';
   </div>
 </template>
 
-<style scoped>
-</style>
+<style scoped></style>

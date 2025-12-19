@@ -2,15 +2,8 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { FileItem, FileContent } from '@/utils/types';
-import {
-  listFiles,
-  readFile,
-  writeFile,
-  createDirectory
-} from '@/services/tauri/commands';
+import { listFiles, readFile, writeFile, createDirectory } from '@/services/tauri/commands';
 import { getFileIcon } from '@/utils/helpers';
-
-
 
 export const useFileStore = defineStore('files', () => {
   // State
@@ -23,6 +16,10 @@ export const useFileStore = defineStore('files', () => {
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
+  // 目录树数据结构：存储每个目录的下级目录和文件
+  // key: 目录路径, value: 该目录下的文件和子目录列表
+  const directoryCache = ref<Map<string, FileItem[]>>(new Map());
+
   // Getters
   const activeFile = computed(() => {
     if (activeFileIndex.value >= 0 && activeFileIndex.value < openedFiles.value.length) {
@@ -33,6 +30,20 @@ export const useFileStore = defineStore('files', () => {
 
   const hasUnsavedChanges = computed(() => {
     return openedFiles.value.some((file) => file.modified);
+  });
+
+  // 获取指定目录的子项（从缓存中）
+  const getDirectoryChildren = computed(() => {
+    return (path: string): FileItem[] | undefined => {
+      return directoryCache.value.get(path);
+    };
+  });
+
+  // 检查目录是否已经加载过
+  const isDirectoryLoaded = computed(() => {
+    return (path: string): boolean => {
+      return directoryCache.value.has(path);
+    };
   });
 
   // Actions
@@ -48,10 +59,12 @@ export const useFileStore = defineStore('files', () => {
         openedFiles.value = [];
         activeFileIndex.value = -1;
       }
-      console.debug('Loading directory:', targetPath);
 
-      files.value = await listFiles(targetPath)
-      console.debug('File list mapped:', files.value);
+      const fileList = await listFiles(targetPath);
+      files.value = fileList;
+
+      // 将加载的目录数据存入缓存
+      directoryCache.value.set(targetPath, fileList);
 
       currentDirectory.value = targetPath;
     } catch (err) {
@@ -66,6 +79,7 @@ export const useFileStore = defineStore('files', () => {
     try {
       error.value = null;
       console.debug('Opening file:', path);
+
       // Check if file is already opened
       const existingIndex = openedFiles.value.findIndex((file) => file.path === path);
       if (existingIndex >= 0) {
@@ -75,11 +89,11 @@ export const useFileStore = defineStore('files', () => {
       const fileItem = files.value.find((file) => file.path === path);
       if (!fileItem) {
         error.value = `文件未找到: ${path}`;
-        throw error;
+        throw new Error(error.value);
       }
-      
+
       currentFile.value = fileItem;
-      
+
       const fileContent = await readFile(path);
       fileContent.language = getFileIcon(fileItem);
       fileContent.size = fileItem.size || 0;
@@ -157,6 +171,9 @@ export const useFileStore = defineStore('files', () => {
       // Reload directory
       await loadDirectory(currentDirectory.value);
 
+      // 删除相关目录缓存
+      removeDirectoryCache(currentDirectory.value);
+
       // If it's a file, open it
       if (!isDirectory) {
         await openFile(path);
@@ -183,6 +200,9 @@ export const useFileStore = defineStore('files', () => {
 
       // Reload directory
       await loadDirectory(currentDirectory.value);
+
+      // 删除相关目录缓存
+      removeDirectoryCache(currentDirectory.value);
     } catch (err) {
       error.value = err instanceof Error ? err.message : '删除文件失败';
       throw err;
@@ -199,18 +219,20 @@ export const useFileStore = defineStore('files', () => {
       // Update opened files
       const fileIndex = openedFiles.value.findIndex((file) => file.path === oldPath);
       if (fileIndex >= 0) {
-  const existing = openedFiles.value[fileIndex]!;
-  openedFiles.value[fileIndex] = {
-    path: newPath,
-    content: existing.content,
-    language: existing.language,
-    modified: existing.modified,
-
-  };
-  }
+        const existing = openedFiles.value[fileIndex]!;
+        openedFiles.value[fileIndex] = {
+          path: newPath,
+          content: existing.content,
+          language: existing.language,
+          modified: existing.modified,
+        };
+      }
 
       // Reload directory
       await loadDirectory(currentDirectory.value);
+
+      // 删除相关目录缓存
+      removeDirectoryCache(currentDirectory.value);
     } catch (err) {
       error.value = err instanceof Error ? err.message : '重命名文件失败';
       throw err;
@@ -219,26 +241,26 @@ export const useFileStore = defineStore('files', () => {
 
   function updateFileContent(content: string) {
     if (activeFileIndex.value >= 0) {
-	const existing = openedFiles.value[activeFileIndex.value]!;
-  openedFiles.value[activeFileIndex.value] = {
-    path: existing.path,
-    content,
-    language: existing.language,
-    modified: true,
-  };
+      const existing = openedFiles.value[activeFileIndex.value]!;
+      openedFiles.value[activeFileIndex.value] = {
+        path: existing.path,
+        content,
+        language: existing.language,
+        modified: true,
+      };
     }
   }
 
   // 从磁盘刷新当前活动文件内容（不标记为已修改）
   function refreshActiveFileContentFromDisk(content: string) {
     if (activeFileIndex.value >= 0) {
-	const existing = openedFiles.value[activeFileIndex.value]!;
-  openedFiles.value[activeFileIndex.value] = {
-    path: existing.path,
-    content,
-    language: existing.language,
-    modified: false,
-  };
+      const existing = openedFiles.value[activeFileIndex.value]!;
+      openedFiles.value[activeFileIndex.value] = {
+        path: existing.path,
+        content,
+        language: existing.language,
+        modified: false,
+      };
     }
   }
 
@@ -277,6 +299,35 @@ export const useFileStore = defineStore('files', () => {
     rootDirectory.value = path;
   }
 
+  // 加载子目录（用于懒加载）
+  async function loadSubDirectory(path: string): Promise<FileItem[]> {
+    try {
+      // 如果已经缓存，直接返回
+      if (directoryCache.value.has(path)) {
+        return directoryCache.value.get(path)!;
+      }
+
+      // 否则加载并缓存
+      const fileList = await listFiles(path);
+      directoryCache.value.set(path, fileList);
+      files.value.push(...fileList);
+      return fileList;
+    } catch (err) {
+      console.error(`Failed to load subdirectory ${path}:`, err);
+      throw err;
+    }
+  }
+
+  // 清空目录缓存
+  function clearDirectoryCache() {
+    directoryCache.value.clear();
+  }
+
+  // 删除指定目录的缓存
+  function removeDirectoryCache(path: string) {
+    directoryCache.value.delete(path);
+  }
+
   return {
     // State
     currentDirectory,
@@ -286,13 +337,17 @@ export const useFileStore = defineStore('files', () => {
     activeFileIndex,
     isLoading,
     error,
+    directoryCache,
 
     // Getters
     activeFile,
     hasUnsavedChanges,
+    getDirectoryChildren,
+    isDirectoryLoaded,
 
     // Actions
     loadDirectory,
+    loadSubDirectory,
     openFile,
     saveFile,
     saveAllFiles,
@@ -307,5 +362,7 @@ export const useFileStore = defineStore('files', () => {
     clearError,
     getRootDirectory,
     setRootDirectory,
+    clearDirectoryCache,
+    removeDirectoryCache,
   };
 });

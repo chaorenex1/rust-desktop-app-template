@@ -4,16 +4,9 @@ import { ElTree, ElInput, ElButton, ElIcon } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
 import { useAppStore } from '@/stores/appStore';
-import { showError } from '@/utils/toast';
+import { showError, showWarning } from '@/utils/toast';
 
-import {
-  listFiles,
-  readFile,
-  writeFile,
-  createDirectory
-} from '@/services/tauri/commands';
-import { f } from 'vue-router/dist/router-CWoNjPRp.mjs';
-import { da } from 'element-plus/es/locales.mjs';
+import { listFiles, readFile, writeFile, createDirectory } from '@/services/tauri/commands';
 import type { FileItem } from '@/utils/types';
 
 const fileStore = useFileStore();
@@ -35,7 +28,6 @@ const treeData = ref<FileNode[]>([]);
 const rootDirectory = ref<FileNode | null>(null);
 const isLoading = ref(false);
 
-
 const defaultProps = {
   children: 'children',
   label: 'name',
@@ -49,24 +41,24 @@ onMounted(async () => {
 });
 
 // 根据文件列表变化更新根节点
-watch(
-  () => fileStore.files,
-  (files) => {
-    treeData.value = files.map((file) => ({
-      name: file.name,
-      path: file.path,
-      isDirectory: file.isDirectory,
-      size: file.size,
-      modified: file.modified,
-      isLeaf: !file.isDirectory,
-    }));
-  },
-  { deep: true }
-);
+// watch(
+//   () => fileStore.getDirectoryChildren(fileStore.getRootDirectory()),
+//   (files) => {
+//     treeData.value = files.map((file) => ({
+//       name: file.name,
+//       path: file.path,
+//       isDirectory: file.isDirectory,
+//       size: file.size,
+//       modified: file.modified,
+//       isLeaf: !file.isDirectory,
+//     }));
+//   },
+//   { deep: true }
+// );
 
 // 监听根目录变化，重新初始化
 watch(
-  () => fileStore.currentDirectory,
+  () => fileStore.getRootDirectory(),
   async (newDir, oldDir) => {
     if (newDir !== oldDir) {
       console.debug('Root directory changed, reinitializing...', { newDir, oldDir });
@@ -98,11 +90,10 @@ async function initialize(refresh: boolean = false) {
   }));
 }
 
-
 // 懒加载子目录（根节点完全由 treeData 提供）
 async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
   const data = node.data as FileNode | undefined;
-  
+
   // Element Plus 初始化时可能调用 loadNode，此时 node.data 为 undefined
   // 根节点数据由 :data="treeData" 提供，无需在这里加载，直接返回即可
   if (!data) {
@@ -115,13 +106,14 @@ async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
   }
 
   // 只有目录节点才会执行到这里
-  console.debug('Loading directory node:', { 
-    nodePath: data.path, 
-    level: node.level 
+  console.debug('Loading directory node:', {
+    nodePath: data.path,
+    level: node.level,
   });
 
   try {
-    const fileList = await listFiles(data.path);
+    // 使用 filesStore 的 loadSubDirectory，支持缓存
+    const fileList = await fileStore.loadSubDirectory(data.path);
     console.debug(`Loaded ${fileList.length} items from ${data.path}`);
 
     const children: FileNode[] = fileList.map((file) => ({
@@ -132,12 +124,15 @@ async function loadNode(node: any, resolve: (data: FileNode[]) => void) {
       modified: file.modified,
       isLeaf: !file.isDirectory,
     }));
-    
-    console.debug('Children nodes:', children.map(c => ({ 
-      name: c.name, 
-      isDirectory: c.isDirectory,
-      isLeaf: c.isLeaf 
-    })));
+
+    console.debug(
+      'Children nodes:',
+      children.map((c) => ({
+        name: c.name,
+        isDirectory: c.isDirectory,
+        isLeaf: c.isLeaf,
+      }))
+    );
 
     resolve(children);
   } catch (error) {
@@ -166,7 +161,7 @@ async function handleNodeClick(data: FileNode, node: any) {
       if (!isLoading.value) {
         isLoading.value = true;
         await fileStore.openFile(data.path);
-      }else{
+      } else {
         showWarning('文件正在打开中，请稍后再试');
       }
     } catch (error) {
@@ -201,29 +196,10 @@ async function refreshDirectory() {
     <div class="border-b border-border bg-surface p-2">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center space-x-1">
-          <ElButton
-            :icon="Plus"
-            size="small"
-            text
-            @click="createNew(false)"
-          >
-            文件
-          </ElButton>
-          <ElButton
-            :icon="Folder"
-            size="small"
-            text
-            @click="createNew(true)"
-          >
-            文件夹
-          </ElButton>
+          <ElButton :icon="Plus" size="small" text @click="createNew(false)"> 文件 </ElButton>
+          <ElButton :icon="Folder" size="small" text @click="createNew(true)"> 文件夹 </ElButton>
         </div>
-        <ElButton
-          :icon="Refresh"
-          size="small"
-          text
-          @click="refreshDirectory"
-        />
+        <ElButton :icon="Refresh" size="small" text @click="refreshDirectory" />
       </div>
 
       <ElInput
@@ -237,22 +213,12 @@ async function refreshDirectory() {
 
     <!-- File Tree -->
     <div class="flex-1 overflow-auto p-2">
-      <div
-        v-if="fileStore.isLoading"
-        class="flex flex-col items-center justify-center h-full"
-      >
-        <div
-          class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"
-        />
-        <p class="mt-2 text-sm text-text-secondary">
-          加载中...
-        </p>
+      <div v-if="fileStore.isLoading" class="flex flex-col items-center justify-center h-full">
+        <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
+        <p class="mt-2 text-sm text-text-secondary">加载中...</p>
       </div>
 
-      <div
-        v-else-if="fileStore.error && !treeData.length"
-        class="text-center p-4 text-error"
-      >
+      <div v-else-if="fileStore.error && !treeData.length" class="text-center p-4 text-error">
         {{ fileStore.error }}
       </div>
 
@@ -271,10 +237,7 @@ async function refreshDirectory() {
       >
         <template #default="{ data }">
           <div class="flex items-center px-1 py-1">
-            <ElIcon
-              :size="16"
-              class="mr-2"
-            >
+            <ElIcon :size="16" class="mr-2">
               <Folder v-if="data.isDirectory" />
               <Document v-else />
             </ElIcon>
@@ -286,10 +249,7 @@ async function refreshDirectory() {
 
     <!-- Current Path -->
     <div class="border-t border-border bg-surface p-2 text-xs text-text-secondary">
-      <div
-        class="truncate"
-        :title="fileStore.currentDirectory"
-      >
+      <div class="truncate" :title="fileStore.currentDirectory">
         当前目录: {{ fileStore.currentDirectory }}
       </div>
     </div>

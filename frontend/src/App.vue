@@ -28,11 +28,7 @@ onMounted(async () => {
     showSuccess('Code AI Assistant 已准备就绪', '应用启动成功');
   } catch (error) {
     console.error('Failed to initialize app:', error);
-    showError(
-      error instanceof Error ? error.message : '未知错误',
-      '应用启动失败',
-      5000
-    );
+    showError(error instanceof Error ? error.message : '未知错误', '应用启动失败', 5000);
   } finally {
     // Always show the layout even if initialization fails
     isLoading.value = false;

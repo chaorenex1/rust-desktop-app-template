@@ -16,8 +16,10 @@ export const useThemeStore = defineStore('theme', () => {
   });
 
   const effectiveTheme = computed(() => {
-    return colorScheme.value === 'system' 
-      ? (isDarkMode.value ? 'dark' : 'light') 
+    return colorScheme.value === 'system'
+      ? isDarkMode.value
+        ? 'dark'
+        : 'light'
       : currentTheme.value;
   });
 
@@ -45,12 +47,12 @@ export const useThemeStore = defineStore('theme', () => {
 
   const applyTheme = () => {
     const themeToApply = effectiveTheme.value;
-    
+
     console.log('Applying theme:', themeToApply);
-    
+
     // Toggle dark class on html element
     document.documentElement.classList.toggle('dark', themeToApply === 'dark');
-    
+
     // Load corresponding theme CSS file
     loadThemeCSS(themeToApply);
   };
@@ -58,14 +60,14 @@ export const useThemeStore = defineStore('theme', () => {
   const loadThemeCSS = (theme: 'light' | 'dark') => {
     // Remove existing theme links
     const existingLinks = document.querySelectorAll('link[data-theme]');
-    existingLinks.forEach(link => link.remove());
+    existingLinks.forEach((link) => link.remove());
 
     // Create and append new theme link
     const link = document.createElement('link');
     link.rel = 'stylesheet';
     link.href = `/src/styles/themes/${theme}.css`;
     link.setAttribute('data-theme', theme);
-    
+
     // Add load event listener for debugging
     link.onload = () => {
       console.log(`Theme CSS loaded: ${theme}.css`);
@@ -73,7 +75,7 @@ export const useThemeStore = defineStore('theme', () => {
     link.onerror = () => {
       console.error(`Failed to load theme CSS: ${theme}.css`);
     };
-    
+
     document.head.appendChild(link);
   };
 

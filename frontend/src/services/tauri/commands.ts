@@ -20,14 +20,16 @@ export async function writeFile(path: string, content: string): Promise<void> {
 }
 
 export async function listFiles(path: string): Promise<FileItem[]> {
-  const fileList = await invoke<Array<{
-    name: string;
-    path: string;
-    is_directory: boolean;
-    size: number;
-    modified?: string;
-  }>>('list_files', { path });
-  
+  const fileList = await invoke<
+    Array<{
+      name: string;
+      path: string;
+      is_directory: boolean;
+      size: number;
+      modified?: string;
+    }>
+  >('list_files', { path });
+
   return fileList.map((file) => ({
     name: file.name,
     path: file.path,
@@ -137,7 +139,11 @@ export async function getCurrentWorkspace(): Promise<Workspace> {
   return invoke('get_current_workspace');
 }
 
-export async function createWorkspace(name: string, path: string, isActive: boolean): Promise<Workspace> {
+export async function createWorkspace(
+  name: string,
+  path: string,
+  isActive: boolean
+): Promise<Workspace> {
   return invoke('create_workspace', { name, path, isActive });
 }
 

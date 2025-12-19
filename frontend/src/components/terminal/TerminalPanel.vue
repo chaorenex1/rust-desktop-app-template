@@ -160,10 +160,7 @@ async function handleCommand(command: string, terminal: Terminal) {
     }
   } catch (error) {
     terminal.writeln(`\x1b[1;31m错误: ${error}\x1b[0m`);
-    showError(
-      error instanceof Error ? error.message : '命令执行失败',
-      '终端错误'
-    );
+    showError(error instanceof Error ? error.message : '命令执行失败', '终端错误');
   }
 
   terminal.write('$ ');

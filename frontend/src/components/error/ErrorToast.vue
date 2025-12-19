@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { WarningFilled, CircleCloseFilled, InfoFilled, SuccessFilled, Close } from '@element-plus/icons-vue';
+import {
+  WarningFilled,
+  CircleCloseFilled,
+  InfoFilled,
+  SuccessFilled,
+  Close,
+} from '@element-plus/icons-vue';
 import { ElIcon } from 'element-plus';
 
 export interface ErrorToastProps {

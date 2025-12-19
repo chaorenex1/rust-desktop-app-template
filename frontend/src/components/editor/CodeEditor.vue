@@ -73,10 +73,7 @@ async function saveCurrentFile() {
     const content = editor.value?.getValue() || '';
     await fileStore.saveFile(content);
   } catch (error) {
-    showError(
-      error instanceof Error ? error.message : '保存文件失败',
-      '保存失败'
-    );
+    showError(error instanceof Error ? error.message : '保存文件失败', '保存失败');
   } finally {
     isLoading.value = false;
   }
@@ -88,10 +85,7 @@ async function saveAllFiles() {
     isLoading.value = true;
     await fileStore.saveAllFiles();
   } catch (error) {
-    showError(
-      error instanceof Error ? error.message : '保存所有文件失败',
-      '保存失败'
-    );
+    showError(error instanceof Error ? error.message : '保存所有文件失败', '保存失败');
   } finally {
     isLoading.value = false;
   }
@@ -103,12 +97,9 @@ function closeFile(index: number) {
   if (!file) return;
 
   if (file.modified) {
-    showConfirm(
-      '文件有未保存的更改，确定要关闭吗？',
-      () => {
-        fileStore.closeFile(file.path);
-      }
-    );
+    showConfirm('文件有未保存的更改，确定要关闭吗？', () => {
+      fileStore.closeFile(file.path);
+    });
   } else {
     fileStore.closeFile(file.path);
   }
