@@ -35,14 +35,12 @@
 
 body {
   font-family:
-    'Inter',
+    'HarmonyOS Sans',
+    'HarmonyOS Sans SC',
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
+    'Microsoft YaHei',
     sans-serif;
   background-color: var(--color-background);
   color: var(--color-text);
