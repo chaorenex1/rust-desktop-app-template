@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Menu, Setting, Folder, Message, Document } from '@element-plus/icons-vue';
 import { ElContainer, ElHeader, ElMain, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { showError, showSuccess } from '@/utils/toast';
 
@@ -37,7 +37,10 @@ const bottomTabs = [
 const activeBottomTab = ref('chat');
 
 // Recent directories
-const recentDirectories = ref<Workspace[]>([]);
+const recentDirectories = computed(() => {
+  return appStore.workspaces.filter(workspace => workspace.path
+    && workspace.path !== fileStore.getRootDirectory());
+});
 
 // Toggle panels
 function toggleFileExplorer() {
@@ -87,7 +90,8 @@ function openSettings() {
 // Load recent directories from backend
 async function loadRecentDirectories() {
   try {
-    recentDirectories.value = appStore.workspaces;
+    recentDirectories.value = appStore.workspaces.filter(workspace => workspace.path
+      && workspace.path !== fileStore.getRootDirectory());
   } catch (error) {
     console.error('加载最近目录失败', error);
     recentDirectories.value = [];
@@ -118,7 +122,7 @@ function handleSelectRecentDirectory(command: Workspace) {
 }
 
 onMounted(() => {
-  loadRecentDirectories();
+  // loadRecentDirectories(); 
   
   // Listen for switch-to-terminal event from FileExplorer
   window.addEventListener('switch-to-terminal', handleSwitchToTerminal);
@@ -131,6 +135,7 @@ onUnmounted(() => {
 
 // Handle switching to terminal tab from FileExplorer
 function handleSwitchToTerminal(event: Event) {
+  event.preventDefault();
   const customEvent = event as CustomEvent;
   activeBottomTab.value = 'terminal';
   showBottomPanel.value = true;
