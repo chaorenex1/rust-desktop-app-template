@@ -18,9 +18,9 @@ const isLoading = ref(false);
 
 // 用于高效对比文件变化的状态
 const lastSavedContent = ref<string>(''); // 最后保存的内容
-const debounceTimer = ref<NodeJS.Timeout>(); // 防抖定时器
+const debounceTimer = ref(); // 防抖定时器
 const isContentDirty = ref<boolean>(false); // 内容是否真的改变了
-const contentChangeQueue = ref<{ content: string; timestamp: number }[]>([]); // 变化队列
+// const contentChangeQueue = ref<{ content: string; timestamp: number }[]>([]); // 变化队列
 const lastContentHash = ref<number>(0); // 内容哈希值，用于快速对比
 
 /**
@@ -73,18 +73,18 @@ function getFileNameFromPath(path: string): string {
   return parts[parts.length - 1] || path;
 }
 
-const duplicateNames = computed(() => {
-  const counts = new Map<string, number>();
-  for (const file of fileStore.openedFiles) {
-    const name = getFileNameFromPath(file.path);
-    counts.set(name, (counts.get(name) || 0) + 1);
-  }
-  return new Set<string>(
-    Array.from(counts.entries())
-      .filter(([, count]) => count > 1)
-      .map(([name]) => name)
-  );
-});
+// const duplicateNames = computed(() => {
+//   const counts = new Map<string, number>();
+//   for (const file of fileStore.openedFiles) {
+//     const name = getFileNameFromPath(file.path);
+//     counts.set(name, (counts.get(name) || 0) + 1);
+//   }
+//   return new Set<string>(
+//     Array.from(counts.entries())
+//       .filter(([, count]) => count > 1)
+//       .map(([name]) => name)
+//   );
+// });
 
 // // onMounted
 // onMounted(() => {
@@ -257,16 +257,13 @@ async function initialize() {
   }
 }
 
-async function reinitialize() {
-  if (contentChangeDisposable.value) {
-    contentChangeDisposable.value.dispose();
-  }
-  if (editor.value) {
-    getRawEditor()?.dispose();
-    await initialize();
-    console.debug('Reinitializing CodeEditor...');
-  }
-}
+// async function reinitialize() {
+//   if (editor.value) {
+//     getRawEditor()?.dispose();
+//     await initialize();
+//     console.debug('Reinitializing CodeEditor...');
+//   }
+// }
 
 function getRawEditor(): monaco.editor.IStandaloneCodeEditor | undefined {
   return toRaw(editor.value);

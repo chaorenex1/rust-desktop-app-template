@@ -16,7 +16,7 @@ export interface ErrorToastProps {
   duration?: number; // 显示时长（毫秒），0 表示不自动关闭
   closable?: boolean; // 是否可手动关闭
   showIcon?: boolean; // 是否显示图标
-  onClose?: () => void; // 关闭回调
+  onClose?: () => boolean; // 关闭回调
 }
 
 const props = withDefaults(defineProps<ErrorToastProps>(), {

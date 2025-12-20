@@ -59,7 +59,7 @@ defineExpose({
         :duration="toast.duration"
         :closable="toast.closable"
         :show-icon="toast.showIcon"
-        @close="removeToast(toast.id)"
+        @close="() => { removeToast(toast.id); return true; }"
       />
     </div>
   </div>

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
-import { ElNotification } from 'element-plus';
 import { useAppStore, useThemeStore } from '@/stores';
 import { ErrorContainer } from '@/components/error';
 import { setToastContainer, showSuccess, showError } from '@/utils/toast';
