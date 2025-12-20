@@ -1,13 +1,9 @@
 import type { FileItem, ChatMessage, Workspace } from './types';
+import { normalizePath as normalizePathUtil, getFileExtension as getFileExtensionUtil } from './pathUtils';
 
 // File system helpers
 export function getFileExtension(filename: string): string {
-  const parts = filename.split('.');
-  if (parts.length <= 1) {
-    return '';
-  }
-  const last = parts[parts.length - 1] ?? '';
-  return last.toLowerCase();
+  return getFileExtensionUtil(filename);
 }
 
 export function getFileIcon(file: FileItem): string {
@@ -156,7 +152,8 @@ export function getFileName(path: string): string {
 }
 
 export function getDirectoryName(path: string): string {
-  const parts = path.split('/').filter(Boolean);
+  const normalized = normalizePathUtil(path);
+  const parts = normalized.split('/').filter(Boolean);
   return parts[parts.length - 1] || '';
 }
 

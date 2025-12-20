@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { AppSettings, Workspace } from '@/utils/types';
+import { normalizePath, getDirectoryName } from '@/utils/pathUtils';
 import {
   getSettings,
   saveSettings,
@@ -174,10 +175,8 @@ export const useAppStore = defineStore('app', () => {
   async function createWorkspace(path: string, isActive: boolean) {
     try {
       // Generate a name for the workspace
-      let name = path.split('/').pop() || '';
-      if (name === path) {
-        name = path.split('\\').pop() || '';
-      }
+      const normalizedPath = normalizePath(path);
+      const name = getDirectoryName(normalizedPath);
       console.debug('Creating workspace with name:', name);
       const newWorkspace: Workspace = await createWorkspaceCommand(name, path, isActive);
       workspaces.value.push(newWorkspace);

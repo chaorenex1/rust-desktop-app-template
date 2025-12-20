@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { FileItem, FileContent } from '@/utils/types';
+import { normalizePath, getParentDirectory, joinPath } from '@/utils/pathUtils';
 import {
   listFiles,
   readFile,
@@ -71,7 +72,7 @@ export const useFileStore = defineStore('files', () => {
   });
 
   // Actions
-  async function loadDirectory(path?: string) {
+  async function loadDirectory(path?: string): Promise<FileItem[]> {
     try {
       isLoading.value = true;
       error.value = null;
@@ -85,12 +86,17 @@ export const useFileStore = defineStore('files', () => {
       }
 
       const fileList = await listFiles(targetPath);
-      files.value = fileList;
+      if (files.value.length === 0) {
+        files.value = fileList;
+      } else {
+        files.value = [...files.value, ...fileList];
+      }
 
       // 将加载的目录数据存入缓存
       directoryCache.value.set(targetPath, fileList);
 
       currentDirectory.value = targetPath;
+      return fileList;
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载目录失败';
       throw err;
@@ -171,10 +177,11 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
-  async function createFile(path:string,name: string, isDirectory = false) {
+  async function createFile(path: string, name: string, isDirectory = false) {
     try {
       error.value = null;
-      const fullPath = `${path}/${name}`;
+      const normalizedPath = normalizePath(path);
+      const fullPath = joinPath(normalizedPath, name);
       console.debug('Creating new file:', { path, name, isDirectory, fullPath });
       if (isDirectory) {
         await createDirectory(fullPath);
@@ -238,8 +245,8 @@ export const useFileStore = defineStore('files', () => {
   async function renameFile(oldPath: string, isDirectory: boolean, newName: string) {
     try {
       error.value = null;
-
-      const newPath = `${currentDirectory.value}/${newName}`;
+      const normalizedCurrentDir = normalizePath(currentDirectory.value);
+      const newPath = joinPath(normalizedCurrentDir, newName);
       await renameFileCommand(oldPath, newPath);
 
       // Update opened files
@@ -355,13 +362,15 @@ export const useFileStore = defineStore('files', () => {
   }
 
   async function reloadDirectory(path: string, isDirectory: boolean = true) {
-    if (isDirectory && path === rootDirectory.value){
-      await loadDirectory(path);
+    console.debug('Reloading directory:', path, { isDirectory });
+    const normalizedPath = normalizePath(path);
+    if (isDirectory && normalizedPath === normalizePath(rootDirectory.value)) {
+      await loadDirectory(normalizedPath);
     } else if (isDirectory) {
-      await loadSubDirectory(path);
+      await loadSubDirectory(normalizedPath);
     } else if (!isDirectory) {
-      const subPath = path.substring(0, path.lastIndexOf('/') + 1);
-      if (subPath === rootDirectory.value) {
+      const subPath = getParentDirectory(normalizedPath);
+      if (normalizePath(subPath) === normalizePath(rootDirectory.value)) {
         await loadDirectory(subPath);
       } else {
         await loadSubDirectory(subPath);

@@ -54,9 +54,12 @@ pub async fn read_file(path: String) -> Result<FileContent, String> {
         .unwrap_or_default()
         .to_string();
     
+    // 规范化路径
+    let normalized_path = crate::utils::fs::normalize_path(&path);
+    
     Ok(FileContent {
         name,
-        path,
+        path: normalized_path,
         content,
         modified: false,
         line_count,
@@ -106,9 +109,12 @@ pub async fn read_max_file(path: String) -> Result<FileContent, String> {
         .unwrap_or_default()
         .to_string();
     
+    // 规范化路径
+    let normalized_path = crate::utils::fs::normalize_path(&path);
+    
     Ok(FileContent {
         name,
-        path,
+        path: normalized_path,
         content,
         modified: false,
         line_count,

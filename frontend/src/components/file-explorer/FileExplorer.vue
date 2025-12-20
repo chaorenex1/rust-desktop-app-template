@@ -57,12 +57,17 @@ watch(
   () => fileStore.currentDirectory,
   async (newDir, oldDir) => {
     console.debug('Current directory changed:', { newDir, oldDir });
-    if (newDir === fileStore.getRootDirectory) {
-      console.debug('Current directory changed, reinitializing...', { newDir, oldDir });
-      await initialize(true);
-    } else {
-      // 更新子节点
-      console.debug('Files changed, updating tree data2');
+    if (newDir != fileStore.getRootDirectory) {
+      // const fileList = await fileStore.loadSubDirectory(newDir);
+      // treeData.value = fileList.map((file) => ({
+      //   name: file.name,
+      //   path: file.path,
+      //   isDirectory: file.isDirectory,
+      //   size: file.size,
+      //   modified: file.modified,
+      //   isLeaf: !file.isDirectory,
+      //   icon: getIcon(file.name, file.isDirectory),
+      // }));
     }
   },
   { deep: true }
@@ -74,15 +79,13 @@ watch(
   async (newDir, oldDir) => {
     if (newDir !== oldDir) {
       console.debug('Root directory changed, reinitializing...', { newDir, oldDir });
-      await initialize(true);
+      await initialize();
     }
   }
 );
 
-async function initialize(refresh: boolean = false) {
-  if (!fileStore.files.length || refresh) {
-    await fileStore.loadDirectory(fileStore.getRootDirectory);
-  }
+async function initialize() {
+  const files = await fileStore.loadDirectory(fileStore.getRootDirectory);
   rootDirectory.value = {
     name: fileStore.getRootDirectory,
     path: fileStore.getRootDirectory,
@@ -90,7 +93,7 @@ async function initialize(refresh: boolean = false) {
     isLeaf: false,
   };
 
-  treeData.value = fileStore.files.map((file) => ({
+  treeData.value = files.map((file) => ({
     name: file.name,
     path: file.path,
     isDirectory: file.isDirectory,
@@ -201,6 +204,7 @@ async function createNew(path: string, isDirectory = false) {
 
       await fileStore.createFile(path,finalName, isDirectory);
       showSuccess('创建成功');
+      await refreshDirectory();
     }
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -211,7 +215,7 @@ async function createNew(path: string, isDirectory = false) {
 
 // Refresh directory
 async function refreshDirectory() {
-  await initialize(true);
+  await initialize();
 }
 
 // Handle context menu commands
@@ -258,6 +262,7 @@ async function handleRename(data: FileNode) {
     if (newName && newName !== data.name) {
       await fileStore.renameFile(data.path,data.isDirectory, newName.trim());
       showSuccess('重命名成功');
+      await refreshDirectory();
     }
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -283,7 +288,7 @@ async function handleDelete(data: FileNode) {
     }
 
     showSuccess('删除成功');
-    // filesStore 会自动重新加载目录，触发树的更新
+    await refreshDirectory();
   } catch (error: any) {
     if (error !== 'cancel') {
       showError(error instanceof Error ? error.message : '删除失败', '删除失败');
