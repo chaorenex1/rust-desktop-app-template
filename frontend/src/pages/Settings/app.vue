@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   ElButton,
@@ -13,53 +13,25 @@ import {
   ElMessage,
   ElPageHeader,
 } from 'element-plus';
-import { useAppStore } from '../../stores/appStore';
+import { useAppStore } from '@/stores';
+import { showSuccess } from '@/utils/toast';
 
 const router = useRouter();
 const appStore = useAppStore();
-
-const settings = ref({
-  theme: 'light',
-  language: 'zh-CN',
-  fontSize: 14,
-  autoSave: true,
-  aiModel: 'gpt-3.5-turbo',
-  apiKey: '',
-});
-
+const settings = computed(() => appStore.settings);
 const themes = [
   { label: '浅色', value: 'light' },
   { label: '深色', value: 'dark' },
-  { label: '自动', value: 'auto' },
-];
-
-const languages = [
-  { label: '简体中文', value: 'zh-CN' },
-  { label: 'English', value: 'en' },
-];
-
-const aiModels = [
-  { label: 'GPT-3.5 Turbo', value: 'gpt-3.5-turbo' },
-  { label: 'GPT-4', value: 'gpt-4' },
-  { label: 'GPT-4 Turbo', value: 'gpt-4-turbo' },
-];
+]
 
 function handleSave() {
-  // TODO: Implement save settings logic
-  ElMessage.success('设置已保存');
+  appStore.saveSettings();
+  showSuccess('设置已保存');
 }
 
 function handleReset() {
-  // Reset to default settings
-  settings.value = {
-    theme: 'light',
-    language: 'zh-CN',
-    fontSize: 14,
-    autoSave: true,
-    aiModel: 'gpt-3.5-turbo',
-    apiKey: '',
-  };
-  ElMessage.info('设置已重置为默认值');
+  appStore.resetToDefaults();
+  showSuccess('设置已重置为默认值');
 }
 
 function goBack() {
@@ -78,7 +50,7 @@ function goBack() {
           </div>
           <button type="button" class="back-button" @click="goBack">返回</button>
         </div>
-        <div class="max-w-3xl space-y-6 settings-page-content">
+        <div class="max-w-3xl wx-auto space-y-6 settings-page-content">
         <!-- 外观设置 -->
         <ElCard>
           <template #header>
@@ -95,21 +67,6 @@ function goBack() {
                 />
               </ElSelect>
             </ElFormItem>
-            <ElFormItem label="语言">
-              <ElSelect v-model="settings.language" class="w-full">
-                <ElOption
-                  v-for="lang in languages"
-                  :key="lang.value"
-                  :label="lang.label"
-                  :value="lang.value"
-                />
-              </ElSelect>
-            </ElFormItem>
-            <ElFormItem label="字体大小">
-              <ElInput v-model.number="settings.fontSize" type="number" :min="10" :max="24">
-                <template #append>px</template>
-              </ElInput>
-            </ElFormItem>
           </ElForm>
         </ElCard>
 
@@ -120,7 +77,42 @@ function goBack() {
           </template>
           <ElForm label-width="120px">
             <ElFormItem label="自动保存">
-              <ElSwitch v-model="settings.autoSave" />
+              <ElSwitch v-model="settings.editor.autoSave" />
+            </ElFormItem>
+            <ElFormItem label="字体大小">
+              <ElInput v-model.number="settings.editor.fontSize" type="number" :min="10" :max="24">
+                <template #append>px</template>
+              </ElInput>
+            </ElFormItem>
+          </ElForm>
+        </ElCard>
+        <!--聊天设置-->
+        <ElCard>
+          <template #header>
+            <h2 class="text-xl font-semibold">编辑器</h2>
+          </template>
+          <ElForm label-width="120px">
+            <ElFormItem label="ENTER发送">
+              <ElSwitch v-model="settings.chat.sendWithEnter" />
+            </ElFormItem>
+            <ElFormItem label="Shift+Enter发送">
+              <ElSwitch v-model="settings.chat.switchLineWithShiftEnter" />
+            </ElFormItem>
+          </ElForm>
+        </ElCard>
+        <!-- 终端设置 -->
+        <ElCard>
+          <template #header>
+            <h2 class="text-xl font-semibold">终端</h2>
+          </template>
+          <ElForm label-width="120px">
+            <ElFormItem label="字体大小">
+              <ElInput v-model.number="settings.terminal.fontSize" type="number" :min="10" :max="24">
+                <template #append>px</template>
+              </ElInput>
+            </ElFormItem>
+            <ElFormItem label="字体家族">
+              <ElInput v-model="settings.terminal.fontFamily" placeholder="输入字体家族" />
             </ElFormItem>
           </ElForm>
         </ElCard>

@@ -67,8 +67,8 @@ async function createNewTerminal() {
 
   // Create terminal instance
   const terminal = new Terminal({
-    fontSize: 14,
-    fontFamily: 'Consolas, "Courier New", monospace',
+    fontSize: appStore.settings.terminal.fontSize,
+    fontFamily: appStore.settings.terminal.fontFamily,
     theme: {
       background: getComputedStyle(document.documentElement)
         .getPropertyValue('--color-background')

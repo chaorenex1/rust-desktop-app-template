@@ -5,7 +5,7 @@ import type { AppSettings, Workspace } from '@/utils/types';
 import { normalizePath, getDirectoryName } from '@/utils/pathUtils';
 import {
   getSettings,
-  saveSettings,
+  saveSettings as saveSettingsCommand,
   getCurrentWorkspace,
   getWorkspaces,
   deleteWorkspace as deleteWorkspaceCommand,
@@ -47,7 +47,7 @@ export const useAppStore = defineStore('app', () => {
     },
     terminal: {
       fontSize: 14,
-      fontFamily: 'monospace',
+      fontFamily: 'Consolas, "Courier New", monospace',
       cursorStyle: 'block',
       cursorBlink: true,
     },
@@ -96,7 +96,7 @@ export const useAppStore = defineStore('app', () => {
             ...backendSettings,
           };
         } else {
-          await saveSettings(JSON.stringify(settings.value));
+          await saveSettings()
           console.warn('No settings received from backend, using defaults.');
         }
         currentAiModel.value = settings.value.ai.defaultModel;
@@ -139,6 +139,10 @@ export const useAppStore = defineStore('app', () => {
     } catch (err) {
       console.error('Failed to load settings:', err);
     }
+  }
+
+  async function saveSettings(){
+    await saveSettingsCommand(JSON.stringify(settings.value));
   }
 
   async function switchWorkspace(workspaceId: string) {
@@ -228,7 +232,7 @@ export const useAppStore = defineStore('app', () => {
   async function resetToDefaults() {
     settings.value = defaultSettings.value;
     saveToStorage();
-    await saveSettings(JSON.stringify(settings.value));
+    await saveSettings();
   }
 
   const saveToStorage = () => {
