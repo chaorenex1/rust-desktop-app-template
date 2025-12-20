@@ -19,7 +19,7 @@ const fitAddon = ref<FitAddon>();
 // Initialize terminal
 onMounted(() => {
   createNewTerminal();
-  
+
   // Listen for open-terminal-in-path event
   window.addEventListener('open-terminal-in-path', handleOpenTerminalInPath);
 });
@@ -29,7 +29,7 @@ onUnmounted(() => {
   terminals.value.forEach((term) => {
     term.terminal.dispose();
   });
-  
+
   // Clean up event listener
   window.removeEventListener('open-terminal-in-path', handleOpenTerminalInPath);
 });
@@ -38,7 +38,7 @@ onUnmounted(() => {
 function handleOpenTerminalInPath(event: Event) {
   const customEvent = event as CustomEvent;
   const path = customEvent.detail?.path;
-  
+
   if (path) {
     createNewTerminal(path);
   }
@@ -47,7 +47,7 @@ function handleOpenTerminalInPath(event: Event) {
 // Create new terminal
 function createNewTerminal(workingDirectory?: string) {
   const id = `terminal-${Date.now()}`;
-  const name = workingDirectory 
+  const name = workingDirectory
     ? `终端 (${workingDirectory.split(/[\\/]/).pop()})`
     : `终端 ${terminals.value.length + 1}`;
 

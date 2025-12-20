@@ -18,8 +18,6 @@ const props = defineProps<{
   activeTab: string;
   visible: boolean;
   height: number;
-  showFileExplorer: boolean;
-  sidebarWidth: number;
 }>();
 
 const emit = defineEmits<{
@@ -32,20 +30,6 @@ const fileStore = useFileStore();
 
 const currentFile = computed(() => fileStore.currentFile);
 
-const FOOTER_HEIGHT = 32;
-
-const bottomPanelStyle = computed(() => ({
-  height: props.height + 'px',
-  left: props.showFileExplorer ? props.sidebarWidth + 4 + 'px' : '0',
-  bottom: FOOTER_HEIGHT + 'px',
-}));
-
-const toggleBarStyle = computed(() => ({
-  left: props.showFileExplorer ? props.sidebarWidth + 4 + 'px' : '0',
-  // 面板可见时：切换条在面板上方；隐藏时：紧贴 footer 上方
-  bottom: (props.visible ? props.height + FOOTER_HEIGHT : FOOTER_HEIGHT) + 'px',
-}));
-
 function onToggleVisible() {
   emit('update:visible', !props.visible);
 }
@@ -56,9 +40,9 @@ function onSelectTab(key: string) {
 </script>
 
 <template>
-  <div>
-    <!-- Bottom Panel Toggle -->
-    <div class="border-t border-border bg-surface px-4 py-1 toggle-bar" :style="toggleBarStyle">
+  <div class="flex flex-col flex-shrink-0">
+    <!-- Bottom Panel Toggle Bar -->
+    <div class="border-t border-border bg-surface px-4 py-1 flex-shrink-0">
       <div class="flex items-center justify-between">
         <ElButtonGroup>
           <ElButton
@@ -66,31 +50,32 @@ function onSelectTab(key: string) {
             :key="tab.key"
             :type="props.activeTab === tab.key ? 'primary' : 'default'"
             :icon="tab.icon"
+            size="small"
             @click="onSelectTab(tab.key)"
           >
             {{ tab.label }}
           </ElButton>
         </ElButtonGroup>
 
-        <ElButton :icon="props.visible ? 'ArrowDown' : 'ArrowUp'" text @click="onToggleVisible">
+        <ElButton :icon="props.visible ? 'ArrowDown' : 'ArrowUp'" size="small" text @click="onToggleVisible">
           {{ props.visible ? '隐藏面板' : '显示面板' }}
         </ElButton>
       </div>
     </div>
 
-    <!-- Bottom Panel -->
+    <!-- Bottom Panel Content -->
     <div
       v-if="props.visible"
-      class="border-t border-border overflow-hidden bottom-panel"
-      :style="bottomPanelStyle"
+      class="border-t border-border bg-background overflow-hidden flex-shrink-0"
+      :style="{ height: props.height + 'px' }"
     >
       <ChatPanel v-if="props.activeTab === 'chat'" />
       <OutputPanel v-else-if="props.activeTab === 'output'" />
       <TerminalPanel v-else-if="props.activeTab === 'terminal'" />
     </div>
 
-    <!-- Footer 状态信息-->
-    <div class="border-t border-border bg-surface px-4 py-2 text-sm text-text-secondary footer-bar">
+    <!-- Footer Status Bar -->
+    <div class="border-t border-border bg-surface px-4 py-2 text-sm text-text-secondary flex-shrink-0">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
           <span>工作区: {{ appStore.currentWorkspace.name }}</span>
@@ -109,20 +94,5 @@ function onSelectTab(key: string) {
 </template>
 
 <style scoped>
-.bottom-panel {
-  position: fixed;
-  right: 0;
-}
-
-.toggle-bar {
-  position: fixed;
-  right: 0;
-}
-
-.footer-bar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-}
+/* 所有样式都移除，使用 flex 布局代替 fixed 定位 */
 </style>

@@ -2,16 +2,13 @@ import path from 'path';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
-import monacoEditorPlugin from 'vite-plugin-monaco-editor';
-
-// @ts-ignore - vite-plugin-monaco-editor 使用 CommonJS 导出
-const { default: monacoEditor } = monacoEditorPlugin as any;
+import monacoEditorEsmPlugin from 'vite-plugin-monaco-editor-esm';
 
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [vue(), tailwindcss(), monacoEditorPlugin({})],
+  plugins: [vue(), tailwindcss(), monacoEditorEsmPlugin({})],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

@@ -1,12 +1,31 @@
 <script setup lang="ts">
-import { Folder, Document, Plus, Refresh, Search, More, Edit, Delete, CopyDocument, Monitor } from '@element-plus/icons-vue';
+import {
+  Folder,
+  Document,
+  Plus,
+  Refresh,
+  Search,
+  More,
+  Edit,
+  Delete,
+  CopyDocument,
+  Monitor,
+} from '@element-plus/icons-vue';
 import { ElTree, ElInput, ElButton, ElIcon, ElMessageBox } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
 import { useAppStore } from '@/stores/appStore';
 import { showError, showWarning, showSuccess } from '@/utils/toast';
 
-import { listFiles, readFile, writeFile, createDirectory, deleteFile, renameFile, deleteDirectory } from '@/services/tauri/commands';
+import {
+  listFiles,
+  readFile,
+  writeFile,
+  createDirectory,
+  deleteFile,
+  renameFile,
+  deleteDirectory,
+} from '@/services/tauri/commands';
 import type { FileItem } from '@/utils/types';
 import { getIcon } from '@/utils/fileIcons';
 
@@ -185,7 +204,7 @@ async function refreshDirectory() {
 // Handle context menu commands
 async function handleContextCommand(command: string, data: FileNode) {
   console.log('Context command:', command, data);
-  
+
   switch (command) {
     case 'rename':
       await handleRename(data);
@@ -221,17 +240,14 @@ async function handleRename(data: FileNode) {
       const newName = result.value.trim();
       const parentPath = data.path.substring(0, data.path.lastIndexOf('/'));
       const newPath = `${parentPath}/${newName}`;
-      
+
       await fileStore.renameFile(data.path, newName);
       showSuccess('重命名成功');
       await initialize(true);
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      showError(
-        error instanceof Error ? error.message : '重命名失败',
-        '重命名失败'
-      );
+      showError(error instanceof Error ? error.message : '重命名失败', '重命名失败');
     }
   }
 }
@@ -256,16 +272,13 @@ async function handleDelete(data: FileNode) {
       } else {
         await fileStore.deleteFile(data.path);
       }
-      
+
       showSuccess('删除成功');
       await initialize(true);
     }
   } catch (error: any) {
     if (error !== 'cancel') {
-      showError(
-        error instanceof Error ? error.message : '删除失败',
-        '删除失败'
-      );
+      showError(error instanceof Error ? error.message : '删除失败', '删除失败');
     }
   }
 }
@@ -300,12 +313,14 @@ async function handleOpenTerminal(data: FileNode) {
       showWarning('只能在文件夹中打开终端');
       return;
     }
-    
+
     // Emit custom event to notify MainLayout to switch to terminal tab
-    window.dispatchEvent(new CustomEvent('switch-to-terminal', {
-      detail: { path: data.path }
-    }));
-    
+    window.dispatchEvent(
+      new CustomEvent('switch-to-terminal', {
+        detail: { path: data.path },
+      })
+    );
+
     showSuccess(`已在 "${data.name}" 打开终端`);
   } catch (error) {
     showError('打开终端失败', '操作失败');
@@ -335,7 +350,7 @@ async function handleOpenTerminal(data: FileNode) {
     </div>
 
     <!-- File Tree -->
-    <div class="flex-1 overflow-auto p-2">
+    <div class="flex-1 overflow-auto min-h-0 p-2">
       <div v-if="fileStore.isLoading" class="flex flex-col items-center justify-center h-full">
         <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500" />
         <p class="mt-2 text-sm text-text-secondary">加载中...</p>
@@ -436,10 +451,6 @@ async function handleOpenTerminal(data: FileNode) {
 :deep(.el-tree-node__expand-icon) {
   font-size: 14px;
   color: var(--color-text-secondary);
-}
-
-:deep(.el-tree-node__children) {
-  overflow: visible;
 }
 
 /* Context menu styling */

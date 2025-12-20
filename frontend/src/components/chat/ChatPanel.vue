@@ -90,7 +90,7 @@ function handleKeyPress(event: KeyboardEvent | Event) {
 
     <!-- Chat Messages Area -->
     <div class="flex-1 overflow-auto p-4">
-      <div class="text-center text-text-secondary">聊天功能开发中...</div>
+      <div class="text-center text-text-secondary"></div>
     </div>
 
     <!-- Input Area -->

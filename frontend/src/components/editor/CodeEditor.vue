@@ -2,16 +2,19 @@
 import { Document, FolderOpened } from '@element-plus/icons-vue';
 import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip } from 'element-plus';
 import monaco from '@/utils/monaco';
-import { ref, onMounted, onUnmounted, watch, nextTick, computed, toRaw } from 'vue';
+import { ref, onBeforeUnmount, onBeforeUpdate, watch, nextTick, computed, toRaw } from 'vue';
 
-import { useFileStore } from '@/stores/filesStore';
-import { invoke } from '@tauri-apps/api/core';
+import { useFileStore, useAppStore } from '@/stores';
+
+const emit = defineEmits<{
+  'load-more': [];
+}>();
 
 const fileStore = useFileStore();
+const appStore = useAppStore();
 const editorContainer = ref<HTMLElement>();
 const editor = ref<monaco.editor.IStandaloneCodeEditor>();
 const isLoading = ref(false);
-const isUpdatingFromStore = ref(false);
 const contentChangeDisposable = ref<monaco.IDisposable>(); // 存储事件监听器
 
 // 处理路径，兼容 Windows 和 POSIX
@@ -33,81 +36,148 @@ const duplicateNames = computed(() => {
   );
 });
 
-function getTabLabel(filePath: string): string {
-  const name = getFileNameFromPath(filePath);
-  return duplicateNames.value.has(name) ? filePath : name;
-}
-
+// // onMounted
+// onMounted(() => {
+//   // 等待 DOM 更新，确保容器已渲染
+//   editor.value = monaco.editor.create(editorContainer.value, {
+//             value: toRaw(newFile.content), // 使用 toRaw 获取原始值
+//             language: newFile.language || 'plaintext',
+//             theme: 'vs',
+//             fontSize: 14,
+//             lineNumbers: 'on',
+//             wordWrap: 'on',
+//             minimap: { enabled: true },
+//             scrollBeyondLastLine: false,
+//             automaticLayout: true,
+//             formatOnPaste: true,
+//             formatOnType: true,
+//           });
+// });
 
 // Watch for active file index changes to switch files
+
 watch(
   () => fileStore.activeFileIndex,
   async (newIndex, oldIndex) => {
     if (newIndex === oldIndex) return;
-    
-    const newFile = fileStore.activeFile;
-    
-    if (newFile) {
-      // 等待 DOM 更新，确保容器已渲染
-      await nextTick();
-      
-      // 首次创建编辑器
-      if (!editor.value && editorContainer.value) {
-        try {
-          editor.value = monaco.editor.create(editorContainer.value, {
-            value: toRaw(newFile.content), // 使用 toRaw 获取原始值
-            language: newFile.language || 'plaintext',
-            theme: 'vs',
-            fontSize: 14,
-            lineNumbers: 'on',
-            wordWrap: 'on',
-            minimap: { enabled: true },
-            scrollBeyondLastLine: false,
-            automaticLayout: true,
-            formatOnPaste: true,
-            formatOnType: true,
-          });
 
-          // Listen to content changes
-          contentChangeDisposable.value = editor.value.onDidChangeModelContent(() => {
-            if (fileStore.activeFile && !isUpdatingFromStore.value) {
-              newFile.content = toRaw(editor.value).getValue() || '';
-            }
-          });
-        } catch (error) {
-          console.error('Failed to create Monaco Editor:', error);
-        }
-      } else if (editor.value) {
+    const newFile = fileStore.activeFile;
+
+    if (newFile) {
+      await initialize();
+      if (editor.value) {
         // 切换文件：更新编辑器内容
-        const model = editor.value.getModel();
+        const model = getRawEditor()?.getModel();
         if (model) {
           // 使用 toRaw 获取原始值，防止 Vue Proxy 导致 Monaco 卡死
-          model.setValue(toRaw(newFile.content));
-          monaco.editor.setModelLanguage(model, newFile.language || 'plaintext');
+          getRawEditor()?.setValue(toRaw(newFile.content));
+          monaco.editor.setModelLanguage(model, toRaw(newFile.language) || 'plaintext');
+          console.debug('File content updated in editor');
         }
       }
-    } else if (editor.value) {
-      // 清空编辑器内容
-      isUpdatingFromStore.value = true;
-      const model = editor.value.getModel();
-      if (model) {
-        model.setValue('');
+    } else {
+      // 没有活动文件时，销毁编辑器
+      if (editor.value) {
+        console.debug('No active file, destroying editor...');
+        getRawEditor()?.dispose();
+        editor.value = undefined; // 清空引用，确保下次能重新创建
+        console.debug('Editor destroyed');
       }
-      isUpdatingFromStore.value = false;
     }
   },
   { immediate: true }
 );
 
-// Cleanup on unmount
-onUnmounted(() => {
+// 组件卸载时销毁实例
+onBeforeUnmount(() => {
   if (contentChangeDisposable.value) {
     contentChangeDisposable.value.dispose();
   }
   if (editor.value) {
-    editor.value.dispose();
+    getRawEditor()?.dispose();
   }
 });
+
+onBeforeUpdate(async () => {
+  console.debug('CodeEditor is about to update');
+  // await reinitialize();
+});
+
+async function initialize() {
+  // 等待 DOM 更新，确保容器已渲染
+  await nextTick();
+  // 首次创建编辑器
+  console.debug('code editor instance:', getRawEditor());
+  if (!editor.value && editorContainer.value) {
+    console.debug('Initializing CodeEditor...');
+    try {
+      editor.value = monaco.editor.create(editorContainer.value, {
+        value: '',
+        language: 'plaintext',
+        theme: 'vs',
+        fontSize: appStore.settings.editor.fontSize,
+        lineNumbers: appStore.settings.editor.lineNumbers,
+        wordWrap: appStore.settings.editor.wordWrap,
+        minimap: appStore.settings.editor.minimap,
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        formatOnPaste: true,
+        formatOnType: true,
+      });
+
+      // 获取编辑器的配置选项
+      // const options = editor.value.getOptions();
+
+      // // 获取行高
+      // const lineHeight = options.get(monaco.editor.EditorOption.lineHeight);
+
+      // // 节流函数
+      // function throttle(func: Function, wait: number) {
+      //   let lastTime = 0;
+      //   return function(this: any, ...args: any[]) {
+      //     const now = Date.now();
+      //     if (now - lastTime >= wait) {
+      //       lastTime = now;
+      //       func.apply(this, args);
+      //     }
+      //   };
+      // }
+
+      // // 监听滚动事件
+      // editor.value.onDidScrollChange(throttle((e: any) => {
+      //   const layoutInfo = editor.value?.getLayoutInfo();
+      //   const scrollTop = e.scrollTop; // 当前滚动位置
+      //   const visibleHeight = layoutInfo?.height || 0; // 可见区域的高度
+
+      //   const model = editor.value?.getModel();
+      //   const lineCount = model?.getLineCount() || 0; // 总行数
+
+      //   // 判断是否滑到底部
+      //   if (scrollTop >= lineCount * lineHeight - visibleHeight && lineCount > 0 && visibleHeight !== undefined) {
+      //     console.log('滚动条滑到底部了！');
+      //     emit('load-more'); // 发出 load-more 事件
+      //   }
+      // }, 1000)); // 1000ms 的节流间隔
+    } catch (error) {
+      console.error('Failed to create Monaco Editor:', error);
+    }
+  }
+}
+
+async function reinitialize() {
+  if (contentChangeDisposable.value) {
+    contentChangeDisposable.value.dispose();
+  }
+  if (editor.value) {
+    getRawEditor()?.dispose();
+    await initialize();
+    console.debug('Reinitializing CodeEditor...');
+  }
+}
+
+function getRawEditor(): monaco.editor.IStandaloneCodeEditor | undefined {
+  return toRaw(editor.value)
+}
 
 // Save current file
 async function saveCurrentFile() {
@@ -152,11 +222,6 @@ function closeFile(index: number) {
   }
   fileStore.closeFile(file.path);
 }
-
-// Switch to file
-function switchToFile(index: number) {
-  fileStore.setActiveFile(index);
-}
 </script>
 
 <template>
@@ -169,23 +234,13 @@ function switchToFile(index: number) {
         closable
         @tab-remove="(name: any) => closeFile(name as number)"
       >
-        <ElTabPane
-          v-for="(file, index) in fileStore.openedFiles"
-          :key="file.path"
-          :name="index"
-        >
+        <ElTabPane v-for="(file, index) in fileStore.openedFiles" :key="file.path" :name="index">
           <template #label>
             <div class="flex items-center">
-              <span
-                class="mr-2 max-w-[180px] truncate"
-                :title="file.path"
-              >
-                {{ getTabLabel(file.path) }}
+              <span class="mr-2 max-w-[180px] truncate" :title="file.path">
+                {{ file.name }}
               </span>
-              <span
-                v-if="file.modified"
-                class="text-warning"
-              >*</span>
+              <span v-if="file.modified" class="text-warning">*</span>
             </div>
           </template>
         </ElTabPane>
@@ -200,30 +255,14 @@ function switchToFile(index: number) {
         </div>
 
         <div class="flex items-center space-x-2">
-          <ElTooltip
-            content="保存当前文件 (Ctrl+S)"
-            placement="bottom"
-          >
-            <ElButton
-              :icon="Document"
-              :loading="isLoading"
-              size="small"
-              @click="saveCurrentFile"
-            >
+          <ElTooltip content="保存当前文件 (Ctrl+S)" placement="bottom">
+            <ElButton :icon="Document" :loading="isLoading" size="small" @click="saveCurrentFile">
               保存
             </ElButton>
           </ElTooltip>
 
-          <ElTooltip
-            content="保存所有文件 (Ctrl+Shift+S)"
-            placement="bottom"
-          >
-            <ElButton
-              :icon="FolderOpened"
-              :loading="isLoading"
-              size="small"
-              @click="saveAllFiles"
-            >
+          <ElTooltip content="保存所有文件 (Ctrl+Shift+S)" placement="bottom">
+            <ElButton :icon="FolderOpened" :loading="isLoading" size="small" @click="saveAllFiles">
               全部保存
             </ElButton>
           </ElTooltip>
@@ -232,25 +271,18 @@ function switchToFile(index: number) {
     </div>
 
     <!-- Editor Area -->
-    <div class="flex-1 overflow-hidden">
+    <div class="flex-1 overflow-hidden min-h-0">
       <div
         v-if="!fileStore.activeFile"
         class="flex flex-col items-center justify-center h-full text-text-secondary"
       >
-        <ElIcon
-          :size="48"
-          class="mb-4"
-        >
+        <ElIcon :size="48" class="mb-4">
           <Document />
         </ElIcon>
         <p>打开一个文件开始编辑</p>
       </div>
 
-      <div
-        v-else
-        ref="editorContainer"
-        class="h-full w-full"
-      />
+      <div v-else ref="editorContainer" class="h-full w-full" />
     </div>
 
     <!-- Status Bar -->
@@ -264,10 +296,7 @@ function switchToFile(index: number) {
         </div>
 
         <div>
-          <span
-            v-if="fileStore.activeFile?.modified"
-            class="text-warning"
-          > 有未保存的更改 </span>
+          <span v-if="fileStore.activeFile?.modified" class="text-warning"> 有未保存的更改 </span>
         </div>
       </div>
     </div>

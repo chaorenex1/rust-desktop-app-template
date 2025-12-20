@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElAside } from 'element-plus';
 import FileExplorer from '@/components/file-explorer/FileExplorer.vue';
+import { ref } from 'vue';
 
 const props = defineProps<{
   visible: boolean;
@@ -9,24 +10,64 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   resizeStart: [event: MouseEvent];
+  updateWidth: [width: number];
 }>();
 
+// 拉伸功能相关
+const sidebarWidth = ref(props.width);
+const isResizing = ref(false);
+let resizeStartX = 0;
+let resizeStartWidth = 0;
+
 function handleResizeStart(event: MouseEvent) {
-  emit('resizeStart', event);
+  isResizing.value = true;
+  resizeStartX = event.clientX;
+  resizeStartWidth = sidebarWidth.value;
+
+  document.addEventListener('mousemove', handleResizing);
+  document.addEventListener('mouseup', handleResizeEnd);
+
+  event.preventDefault();
+}
+
+function handleResizing(event: MouseEvent) {
+  if (!isResizing.value) return;
+
+  // 向右拉伸：鼠标右移增加宽度，左移减少宽度
+  const delta = event.clientX - resizeStartX;
+  const minWidth = 180;
+  const maxWidth = 600;
+  let nextWidth = resizeStartWidth + delta;
+
+  if (nextWidth < minWidth) nextWidth = minWidth;
+  if (nextWidth > maxWidth) nextWidth = maxWidth;
+
+  sidebarWidth.value = nextWidth;
+  emit('updateWidth', nextWidth);
+}
+
+function handleResizeEnd() {
+  if (!isResizing.value) return;
+
+  isResizing.value = false;
+  document.removeEventListener('mousemove', handleResizing);
+  document.removeEventListener('mouseup', handleResizeEnd);
 }
 </script>
 
 <template>
   <template v-if="props.visible">
     <ElAside
-      class="border-r border-border bg-surface overflow-auto"
-      :style="{ width: props.width + 'px' }"
+      class="border-r border-border bg-surface overflow-hidden"
+      :style="{ width: sidebarWidth + 'px' }"
     >
-      <FileExplorer />
+      <div class="h-full overflow-auto">
+        <FileExplorer />
+      </div>
     </ElAside>
 
-    <div 
-      class="sidebar-resizer" 
+    <div
+      class="sidebar-resizer"
       @mousedown="handleResizeStart"
       @dblclick="() => emit('resize-reset')"
     />
@@ -35,7 +76,7 @@ function handleResizeStart(event: MouseEvent) {
 
 <style scoped>
 .sidebar-resizer {
-  width: 6px;
+  /* width: 4px; */
   cursor: col-resize;
   background-color: transparent;
   position: relative;
@@ -58,7 +99,7 @@ function handleResizeStart(event: MouseEvent) {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 2px;
+  width: 10px;
   height: 40px;
   background-color: var(--color-border);
   border-radius: 2px;

@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import { Menu, Setting, Folder, Message, Document } from '@element-plus/icons-vue';
-import { ElContainer, ElHeader, ElMain, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus';
+import {
+  ElContainer,
+  ElHeader,
+  ElMain,
+  ElDropdown,
+  ElDropdownMenu,
+  ElDropdownItem,
+} from 'element-plus';
 import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { showError, showSuccess } from '@/utils/toast';
@@ -38,8 +45,9 @@ const activeBottomTab = ref('chat');
 
 // Recent directories
 const recentDirectories = computed(() => {
-  return appStore.workspaces.filter(workspace => workspace.path
-    && workspace.path !== fileStore.getRootDirectory());
+  return appStore.workspaces.filter(
+    (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory()
+  );
 });
 
 // Toggle panels
@@ -55,7 +63,7 @@ function onSidebarResizeStart(event: MouseEvent) {
 
   document.addEventListener('mousemove', onSidebarResizing);
   document.addEventListener('mouseup', onSidebarResizeEnd);
-  
+
   // 防止文本选择
   event.preventDefault();
 }
@@ -82,6 +90,11 @@ function onSidebarResizeEnd() {
   document.removeEventListener('mouseup', onSidebarResizeEnd);
 }
 
+// Handle sidebar width update from MainSidebar
+function onSidebarWidthUpdate(newWidth: number) {
+  sidebarWidth.value = newWidth;
+}
+
 // Open settings page
 function openSettings() {
   router.push('/settings');
@@ -90,8 +103,9 @@ function openSettings() {
 // Load recent directories from backend
 async function loadRecentDirectories() {
   try {
-    recentDirectories.value = appStore.workspaces.filter(workspace => workspace.path
-      && workspace.path !== fileStore.getRootDirectory());
+    recentDirectories.value = appStore.workspaces.filter(
+      (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory()
+    );
   } catch (error) {
     console.error('加载最近目录失败', error);
     recentDirectories.value = [];
@@ -122,8 +136,8 @@ function handleSelectRecentDirectory(command: Workspace) {
 }
 
 onMounted(() => {
-  // loadRecentDirectories(); 
-  
+  // loadRecentDirectories();
+
   // Listen for switch-to-terminal event from FileExplorer
   window.addEventListener('switch-to-terminal', handleSwitchToTerminal);
 });
@@ -139,12 +153,14 @@ function handleSwitchToTerminal(event: Event) {
   const customEvent = event as CustomEvent;
   activeBottomTab.value = 'terminal';
   showBottomPanel.value = true;
-  
+
   // Emit event to TerminalPanel to open terminal in the specified path
   if (customEvent.detail?.path) {
-    window.dispatchEvent(new CustomEvent('open-terminal-in-path', {
-      detail: { path: customEvent.detail.path }
-    }));
+    window.dispatchEvent(
+      new CustomEvent('open-terminal-in-path', {
+        detail: { path: customEvent.detail.path },
+      })
+    );
   }
 }
 </script>
@@ -205,27 +221,29 @@ function handleSwitchToTerminal(event: Event) {
     </ElHeader>
 
     <!-- Main Content -->
-    <ElContainer class="flex-1">
-      <MainSidebar 
-        :visible="showFileExplorer" 
-        :width="sidebarWidth" 
+    <ElContainer class="flex-1 overflow-hidden">
+      <MainSidebar
+        :visible="showFileExplorer"
+        :width="sidebarWidth"
         @resize-start="onSidebarResizeStart"
+        @updateWidth="onSidebarWidthUpdate"
       />
 
       <!-- Main Content Area -->
       <ElMain class="flex-1 overflow-hidden min-w-0">
         <!-- Editor View -->
-        <div class="h-full flex flex-col" :style="{ paddingBottom: bottomPanelHeight + 32 + 'px' }">
+        <div class="h-full flex flex-col">
           <!-- Editor Area -->
-          <EditorArea />
+          <div class="flex-1 overflow-hidden min-h-0">
+            <EditorArea />
+          </div>
 
+          <!-- Bottom Panel -->
           <BottomTabs
             :tabs="bottomTabs"
             :active-tab="activeBottomTab"
             :visible="showBottomPanel"
             :height="bottomPanelHeight"
-            :show-file-explorer="showFileExplorer"
-            :sidebar-width="sidebarWidth"
             @update:activeTab="activeBottomTab = $event"
             @update:visible="showBottomPanel = $event"
           />
@@ -243,10 +261,16 @@ function handleSwitchToTerminal(event: Event) {
 
 :deep(.el-aside) {
   width: 256px;
+  overflow: hidden;
 }
 
 :deep(.el-main) {
   padding: 0;
+  overflow: hidden;
+}
+
+:deep(.el-container) {
+  overflow: hidden;
 }
 
 .recent-dropdown-trigger {

@@ -12,7 +12,9 @@
   --color-success: #10b981;
   --color-warning: #f59e0b;
 
-  --font-mono: 'HarmonyOS Sans Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  --font-mono:
+    'HarmonyOS Sans Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', 'Courier New',
+    monospace;
 
   --animate-spin: spin 1s linear infinite;
 
@@ -46,7 +48,9 @@
 
 /* Monaco Editor custom styles */
 .monaco-editor {
-  font-family: 'HarmonyOS Sans Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family:
+    'HarmonyOS Sans Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'Monaco', 'Courier New',
+    monospace;
 }
 
 /* xterm.js custom styles */

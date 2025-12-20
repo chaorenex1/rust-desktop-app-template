@@ -93,19 +93,12 @@ export const useFileStore = defineStore('files', () => {
       currentFile.value = fileItem;
 
       const fileContent = await readFile(path);
-      console.debug('Read file content:', {
-        path: fileContent.path,
-        contentLength: fileContent.content.length,
-        lineCount: fileContent.lineCount,
-        size: fileContent.size,
-      });
-      
+
       fileContent.language = getFileIcon(fileItem);
       fileContent.size = fileItem.size || 0;
 
       openedFiles.value.push(fileContent);
       activeFileIndex.value = openedFiles.value.length - 1;
-      console.debug('Opened file:', fileContent);
       return fileContent;
     } catch (err) {
       error.value = err instanceof Error ? err.message : '打开文件失败';
