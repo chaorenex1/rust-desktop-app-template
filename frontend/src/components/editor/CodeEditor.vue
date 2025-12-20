@@ -176,7 +176,7 @@ async function reinitialize() {
 }
 
 function getRawEditor(): monaco.editor.IStandaloneCodeEditor | undefined {
-  return toRaw(editor.value)
+  return toRaw(editor.value);
 }
 
 // Save current file

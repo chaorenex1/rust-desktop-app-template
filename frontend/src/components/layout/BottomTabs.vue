@@ -57,7 +57,12 @@ function onSelectTab(key: string) {
           </ElButton>
         </ElButtonGroup>
 
-        <ElButton :icon="props.visible ? 'ArrowDown' : 'ArrowUp'" size="small" text @click="onToggleVisible">
+        <ElButton
+          :icon="props.visible ? 'ArrowDown' : 'ArrowUp'"
+          size="small"
+          text
+          @click="onToggleVisible"
+        >
           {{ props.visible ? '隐藏面板' : '显示面板' }}
         </ElButton>
       </div>
@@ -75,12 +80,14 @@ function onSelectTab(key: string) {
     </div>
 
     <!-- Footer Status Bar -->
-    <div class="border-t border-border bg-surface px-4 py-2 text-sm text-text-secondary flex-shrink-0">
+    <div
+      class="border-t border-border bg-surface px-4 py-2 text-sm text-text-secondary flex-shrink-0"
+    >
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
           <span>工作区: {{ appStore.currentWorkspace.name }}</span>
           <span>|</span>
-          <span>文件: {{ currentFile?.path || '未选择文件' }}</span>
+          <span>文件: {{ fileStore.getCurrentFile?.path || '未选择文件' }}</span>
         </div>
 
         <div class="flex items-center space-x-4">

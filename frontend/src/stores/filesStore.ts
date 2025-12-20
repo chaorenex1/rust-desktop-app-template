@@ -1,8 +1,15 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import type { FileItem, FileContent } from '@/utils/types';
-import { listFiles, readFile, writeFile, createDirectory } from '@/services/tauri/commands';
+import {
+  listFiles,
+  readFile,
+  writeFile,
+  createDirectory,
+  deleteDirectory as deleteDirectoryCommand,
+  deleteFile as deleteFileCommand,
+  renameFile as renameFileCommand,
+} from '@/services/tauri/commands';
 import { getFileIcon } from '@/utils/helpers';
 
 export const useFileStore = defineStore('files', () => {
@@ -11,8 +18,8 @@ export const useFileStore = defineStore('files', () => {
   const rootDirectory = ref<string>('.');
   const files = ref<FileItem[]>([]);
   const openedFiles = ref<FileContent[]>([]);
-  const currentFile = ref<FileItem | null>(null);
   const activeFileIndex = ref<number>(-1);
+  const currentFile = ref<FileItem | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
 
@@ -27,6 +34,23 @@ export const useFileStore = defineStore('files', () => {
     }
     return null;
   });
+
+  const getRootDirectory = computed(() => {
+    return rootDirectory.value;
+  });
+
+  // Get the current directory
+  const getCurrentDirectory = computed(() => {
+    return currentDirectory.value;
+  });
+
+  const getCurrentFile = computed(() => {
+    return currentFile.value;
+  });
+
+  // const activeFileIndex = computed(() => {
+  //   return openedFiles.value.findIndex((file) => file.path === currentFile.value?.path);
+  // });
 
   const hasUnsavedChanges = computed(() => {
     return openedFiles.value.some((file) => file.modified);
@@ -116,11 +140,7 @@ export const useFileStore = defineStore('files', () => {
       }
 
       const saveContent = content || file.content;
-      await invoke('write_file', {
-        path: file.path,
-        content: saveContent,
-      });
-
+      await writeFile(file.path, saveContent);
       // Update file content and mark as saved
       if (activeFileIndex.value >= 0) {
         openedFiles.value[activeFileIndex.value] = {
@@ -141,10 +161,7 @@ export const useFileStore = defineStore('files', () => {
 
       for (const file of openedFiles.value) {
         if (file.modified) {
-          await invoke('write_file', {
-            path: file.path,
-            content: file.content,
-          });
+          await writeFile(file.path, file.content);
           file.modified = false;
         }
       }
@@ -154,28 +171,22 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
-  async function createFile(name: string, isDirectory = false) {
+  async function createFile(path:string,name: string, isDirectory = false) {
     try {
       error.value = null;
-
-      const path = `${currentDirectory.value}/${name}`;
-
+      const fullPath = `${path}/${name}`;
+      console.debug('Creating new file:', { path, name, isDirectory, fullPath });
       if (isDirectory) {
-        await invoke('create_directory', { path });
+        await createDirectory(fullPath);
       } else {
-        await invoke('create_file', { path });
+        await writeFile(fullPath, '');
       }
 
-      // Reload directory
-      await loadDirectory(currentDirectory.value);
+      // 删除相关目录缓存，强制重新加载
+      removeDirectoryCache(path, false);
 
-      // 删除相关目录缓存
-      removeDirectoryCache(currentDirectory.value);
-
-      // If it's a file, open it
-      if (!isDirectory) {
-        await openFile(path);
-      }
+      // 重新加载当前目录
+      await reloadDirectory(currentDirectory.value, false);
     } catch (err) {
       error.value = err instanceof Error ? err.message : '创建文件失败';
       throw err;
@@ -194,43 +205,64 @@ export const useFileStore = defineStore('files', () => {
       }
 
       // Delete file
-      await invoke('delete_file', { path });
+      await deleteFileCommand(path, false);
 
-      // Reload directory
-      await loadDirectory(currentDirectory.value);
-
-      // 删除相关目录缓存
+      // 删除相关目录缓存，强制重新加载
       removeDirectoryCache(currentDirectory.value);
+
+      //Reload directory
+      await reloadDirectory(currentDirectory.value, false);
     } catch (err) {
       error.value = err instanceof Error ? err.message : '删除文件失败';
       throw err;
     }
   }
 
-  async function renameFile(oldPath: string, newName: string) {
+  async function deleteDirectory(path: string) {
+    try {
+      error.value = null;
+
+      // Delete directory
+      await deleteDirectoryCommand(path);
+
+      // 删除相关目录缓存，强制重新加载
+      removeDirectoryCache(path);
+      // Reload directory
+      await reloadDirectory(currentDirectory.value, true);
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : '删除目录失败';
+      throw err;
+    }
+  }
+
+  async function renameFile(oldPath: string, isDirectory: boolean, newName: string) {
     try {
       error.value = null;
 
       const newPath = `${currentDirectory.value}/${newName}`;
-      await invoke('rename_file', { oldPath, newPath });
+      await renameFileCommand(oldPath, newPath);
 
       // Update opened files
       const fileIndex = openedFiles.value.findIndex((file) => file.path === oldPath);
       if (fileIndex >= 0) {
         const existing = openedFiles.value[fileIndex]!;
         openedFiles.value[fileIndex] = {
+          name: newName,
           path: newPath,
           content: existing.content,
           language: existing.language,
           modified: existing.modified,
+          lineCount: existing.lineCount,
+          size: existing.size,
         };
       }
 
+      // 删除相关目录缓存，强制重新加载
+      if (isDirectory) {
+        removeDirectoryCache(oldPath);
+      }
       // Reload directory
-      await loadDirectory(currentDirectory.value);
-
-      // 删除相关目录缓存
-      removeDirectoryCache(currentDirectory.value);
+      await reloadDirectory(currentDirectory.value, false);
     } catch (err) {
       error.value = err instanceof Error ? err.message : '重命名文件失败';
       throw err;
@@ -243,9 +275,12 @@ export const useFileStore = defineStore('files', () => {
       const existing = openedFiles.value[activeFileIndex.value]!;
       openedFiles.value[activeFileIndex.value] = {
         path: existing.path,
+        name: existing.name,
         content,
         language: existing.language,
         modified: false,
+        lineCount: existing.lineCount,
+        size: existing.size,
       };
     }
   }
@@ -269,6 +304,10 @@ export const useFileStore = defineStore('files', () => {
         }
       }
     }
+    // 判断是否是当前文件
+    if (currentFile.value?.path === path) {
+      currentFile.value = null;
+    }
   }
 
   function closeAllFiles() {
@@ -284,10 +323,6 @@ export const useFileStore = defineStore('files', () => {
 
   function clearError() {
     error.value = null;
-  }
-
-  function getRootDirectory() {
-    return rootDirectory.value;
   }
 
   function setRootDirectory(path: string) {
@@ -306,6 +341,7 @@ export const useFileStore = defineStore('files', () => {
       const fileList = await listFiles(path);
       directoryCache.value.set(path, fileList);
       files.value.push(...fileList);
+      currentDirectory.value = path;
       return fileList;
     } catch (err) {
       console.error(`Failed to load subdirectory ${path}:`, err);
@@ -318,9 +354,42 @@ export const useFileStore = defineStore('files', () => {
     directoryCache.value.clear();
   }
 
-  // 删除指定目录的缓存
-  function removeDirectoryCache(path: string) {
-    directoryCache.value.delete(path);
+  async function reloadDirectory(path: string, isDirectory: boolean = true) {
+    if (isDirectory && path === rootDirectory.value){
+      await loadDirectory(path);
+    } else if (isDirectory) {
+      await loadSubDirectory(path);
+    } else if (!isDirectory) {
+      const subPath = path.substring(0, path.lastIndexOf('/') + 1);
+      if (subPath === rootDirectory.value) {
+        await loadDirectory(subPath);
+      } else {
+        await loadSubDirectory(subPath);
+      }
+    }
+  }
+
+  function removeDirectoryCache(path: string, isDirectory: boolean = true) {
+    if (isDirectory) {
+      directoryCache.value.delete(path);
+      // 递归删除子目录缓存
+      directoryCache.value.forEach((_, subPath) => {
+        if (subPath.startsWith(path)) {
+          directoryCache.value.delete(subPath);
+        }
+      });
+    } else {
+      const subPath = path.substring(0, path.lastIndexOf('/') + 1);
+      directoryCache.value.delete(subPath);
+      directoryCache.value.forEach((_, subPath) => {
+        if (subPath.startsWith(subPath)) {
+          directoryCache.value.delete(subPath);
+        }
+      });
+      // 删除相关文件缓存
+      files.value = files.value.filter((file) => !file.path.startsWith(path));
+      openedFiles.value = openedFiles.value.filter((file) => !file.path.startsWith(path));
+    }
   }
 
   return {
@@ -339,6 +408,9 @@ export const useFileStore = defineStore('files', () => {
     hasUnsavedChanges,
     getDirectoryChildren,
     isDirectoryLoaded,
+    getCurrentDirectory,
+    getCurrentFile,
+    getRootDirectory,
 
     // Actions
     loadDirectory,
@@ -348,13 +420,13 @@ export const useFileStore = defineStore('files', () => {
     saveAllFiles,
     createFile,
     deleteFile,
+    deleteDirectory,
     renameFile,
     refreshActiveFileContentFromDisk,
     closeFile,
     closeAllFiles,
     setActiveFile,
     clearError,
-    getRootDirectory,
     setRootDirectory,
     clearDirectoryCache,
     removeDirectoryCache,

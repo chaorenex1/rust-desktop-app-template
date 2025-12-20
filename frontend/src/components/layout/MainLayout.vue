@@ -46,7 +46,7 @@ const activeBottomTab = ref('chat');
 // Recent directories
 const recentDirectories = computed(() => {
   return appStore.workspaces.filter(
-    (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory()
+    (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory
   );
 });
 
@@ -104,7 +104,7 @@ function openSettings() {
 async function loadRecentDirectories() {
   try {
     recentDirectories.value = appStore.workspaces.filter(
-      (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory()
+      (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory
     );
   } catch (error) {
     console.error('加载最近目录失败', error);

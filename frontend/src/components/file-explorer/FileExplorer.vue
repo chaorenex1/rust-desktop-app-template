@@ -16,18 +16,9 @@ import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
 import { useAppStore } from '@/stores/appStore';
 import { showError, showWarning, showSuccess } from '@/utils/toast';
-
-import {
-  listFiles,
-  readFile,
-  writeFile,
-  createDirectory,
-  deleteFile,
-  renameFile,
-  deleteDirectory,
-} from '@/services/tauri/commands';
 import type { FileItem } from '@/utils/types';
 import { getIcon } from '@/utils/fileIcons';
+import { da } from 'element-plus/es/locales.mjs';
 
 const fileStore = useFileStore();
 const appStore = useAppStore();
@@ -61,25 +52,25 @@ onMounted(async () => {
   await initialize();
 });
 
-// 根据文件列表变化更新根节点
-// watch(
-//   () => fileStore.getDirectoryChildren(fileStore.getRootDirectory()),
-//   (files) => {
-//     treeData.value = files.map((file) => ({
-//       name: file.name,
-//       path: file.path,
-//       isDirectory: file.isDirectory,
-//       size: file.size,
-//       modified: file.modified,
-//       isLeaf: !file.isDirectory,
-//     }));
-//   },
-//   { deep: true }
-// );
+// 根据当前目录变化
+watch(
+  () => fileStore.currentDirectory,
+  async (newDir, oldDir) => {
+    console.debug('Current directory changed:', { newDir, oldDir });
+    if (newDir === fileStore.getRootDirectory) {
+      console.debug('Current directory changed, reinitializing...', { newDir, oldDir });
+      await initialize(true);
+    } else {
+      // 更新子节点
+      console.debug('Files changed, updating tree data2');
+    }
+  },
+  { deep: true }
+);
 
 // 监听根目录变化，重新初始化
 watch(
-  () => fileStore.getRootDirectory(),
+  () => fileStore.getRootDirectory,
   async (newDir, oldDir) => {
     if (newDir !== oldDir) {
       console.debug('Root directory changed, reinitializing...', { newDir, oldDir });
@@ -90,11 +81,11 @@ watch(
 
 async function initialize(refresh: boolean = false) {
   if (!fileStore.files.length || refresh) {
-    await fileStore.loadDirectory(fileStore.getRootDirectory());
+    await fileStore.loadDirectory(fileStore.getRootDirectory);
   }
   rootDirectory.value = {
-    name: fileStore.currentDirectory,
-    path: fileStore.currentDirectory,
+    name: fileStore.getRootDirectory,
+    path: fileStore.getRootDirectory,
     isDirectory: true,
     isLeaf: false,
   };
@@ -189,10 +180,32 @@ async function handleNodeClick(data: FileNode, node: any) {
 }
 
 // Create new file/folder
-async function createNew(isDirectory = false) {
-  const name = prompt(`请输入${isDirectory ? '文件夹' : '文件'}名称:`);
-  if (name) {
-    await fileStore.createFile(name, isDirectory);
+async function createNew(path: string, isDirectory = false) {
+  try {
+    const { value: name } = await ElMessageBox.prompt(
+      `请输入${isDirectory ? '文件夹' : '文件'}名称`,
+      '创建新文件',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        inputPattern: /^[^\\/:*?"<>|]+$/,
+        inputErrorMessage: '名称不能包含特殊字符: \\ / : * ? " < > |',
+      }
+    );
+
+    if (name) {
+      console.debug('Creating new file:', { path, name, isDirectory });
+      // 检查有无扩展名
+      const hasExtension = name.split('.').length > 1;
+      const finalName = !hasExtension ? (isDirectory ? name : `${name}.txt`) : name;
+
+      await fileStore.createFile(path,finalName, isDirectory);
+      showSuccess('创建成功');
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      showError(error instanceof Error ? error.message : '创建失败', '创建失败');
+    }
   }
 }
 
@@ -206,6 +219,12 @@ async function handleContextCommand(command: string, data: FileNode) {
   console.log('Context command:', command, data);
 
   switch (command) {
+    case 'new_file':
+      await createNew(data.path,false);
+      break;
+    case 'new_folder':
+      await createNew(data.path,true);
+      break;
     case 'rename':
       await handleRename(data);
       break;
@@ -224,7 +243,7 @@ async function handleContextCommand(command: string, data: FileNode) {
 // Rename file or directory
 async function handleRename(data: FileNode) {
   try {
-    const result = await ElMessageBox.prompt(
+    const { value: newName } = await ElMessageBox.prompt(
       `请输入新的${data.isDirectory ? '文件夹' : '文件'}名称`,
       '重命名',
       {
@@ -236,14 +255,9 @@ async function handleRename(data: FileNode) {
       }
     );
 
-    if (result.value && result.value !== data.name) {
-      const newName = result.value.trim();
-      const parentPath = data.path.substring(0, data.path.lastIndexOf('/'));
-      const newPath = `${parentPath}/${newName}`;
-
-      await fileStore.renameFile(data.path, newName);
+    if (newName && newName !== data.name) {
+      await fileStore.renameFile(data.path,data.isDirectory, newName.trim());
       showSuccess('重命名成功');
-      await initialize(true);
     }
   } catch (error: any) {
     if (error !== 'cancel') {
@@ -255,27 +269,21 @@ async function handleRename(data: FileNode) {
 // Delete file or directory
 async function handleDelete(data: FileNode) {
   try {
-    const confirmResult = await ElMessageBox.confirm(
-      `确定要删除 "${data.name}" 吗？此操作不可恢复。`,
-      '确认删除',
-      {
-        confirmButtonText: '删除',
-        cancelButtonText: '取消',
-        type: 'warning',
-        buttonSize: 'default',
-      }
-    );
+    await ElMessageBox.confirm(`确定要删除 "${data.name}" 吗？此操作不可恢复。`, '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      buttonSize: 'default',
+    });
 
-    if (confirmResult) {
-      if (data.isDirectory) {
-        await deleteDirectory(data.path);
-      } else {
-        await fileStore.deleteFile(data.path);
-      }
-
-      showSuccess('删除成功');
-      await initialize(true);
+    if (data.isDirectory) {
+      await fileStore.deleteDirectory(data.path);
+    } else {
+      await fileStore.deleteFile(data.path);
     }
+
+    showSuccess('删除成功');
+    // filesStore 会自动重新加载目录，触发树的更新
   } catch (error: any) {
     if (error !== 'cancel') {
       showError(error instanceof Error ? error.message : '删除失败', '删除失败');
@@ -334,8 +342,8 @@ async function handleOpenTerminal(data: FileNode) {
     <div class="border-b border-border bg-surface p-2">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center space-x-1">
-          <ElButton :icon="Plus" size="small" text @click="createNew(false)"> 文件 </ElButton>
-          <ElButton :icon="Folder" size="small" text @click="createNew(true)"> 文件夹 </ElButton>
+            <ElButton :icon="Plus" size="small" text @click="createNew(fileStore.getRootDirectory,false)"> 文件 </ElButton>
+          <ElButton :icon="Folder" size="small" text @click="createNew(fileStore.getRootDirectory,true)"> 文件夹 </ElButton>
         </div>
         <ElButton :icon="Refresh" size="small" text @click="refreshDirectory" />
       </div>
@@ -400,6 +408,14 @@ async function handleOpenTerminal(data: FileNode) {
                 </span>
                 <template #dropdown>
                   <ElDropdownMenu>
+                    <ElDropdownItem command="new_file" v-if="data.isDirectory">
+                      <ElIcon class="mr-2"><Plus /></ElIcon>
+                      新文件
+                    </ElDropdownItem>
+                    <ElDropdownItem command="new_folder" v-if="data.isDirectory">
+                      <ElIcon class="mr-2"><Folder /></ElIcon>
+                      新文件夹
+                    </ElDropdownItem>
                     <ElDropdownItem command="rename">
                       <ElIcon class="mr-2"><Edit /></ElIcon>
                       重命名
