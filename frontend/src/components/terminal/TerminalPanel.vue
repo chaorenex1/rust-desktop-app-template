@@ -24,7 +24,7 @@ const shellOptions = computed(() =>
     : [
         { label: 'bash', value: 'bash' },
         { label: 'zsh', value: 'zsh' },
-      ],
+      ]
 );
 const terminalContainer = ref<HTMLElement>();
 // 仅在组件中保存 xterm 实例映射，真正的数据（id/name/sessionId、当前激活索引）放到 Pinia store 中
@@ -91,12 +91,11 @@ async function createNewTerminal() {
 
   // Store terminal metadata and keep xterm instance locally
   terminalStore.addTerminal({ id: sessionId, name, sessionId, terminal });
-  if (isWindows){
+  if (isWindows) {
     appStore.setCurrentShell('powershell');
-  }else{
+  } else {
     appStore.setCurrentShell('bash');
   }
-
 
   // Initialize terminal after DOM update
   nextTick(() => {
@@ -134,10 +133,7 @@ function setupCommandHandling(terminal: Terminal, sessionId: string) {
 
   terminal.onKey(async ({ key, domEvent }) => {
     const printable =
-      !domEvent.altKey &&
-      !domEvent.ctrlKey &&
-      !domEvent.metaKey &&
-      domEvent.key.length === 1;
+      !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey && domEvent.key.length === 1;
 
     switch (domEvent.key) {
       case 'Enter': {
@@ -228,7 +224,9 @@ async function handleCommand(command: string, terminal: Terminal, sessionId: str
   }
 
   if (trimmedCommand === 'exit') {
-    const index = terminals.value.findIndex((t: TerminalTab) => terminalInstances.value[t.id] === terminal);
+    const index = terminals.value.findIndex(
+      (t: TerminalTab) => terminalInstances.value[t.id] === terminal
+    );
     if (index >= 0) {
       closeTerminal(index);
     }
@@ -316,23 +314,9 @@ function refreshTerminal() {
         </ElTabs>
 
         <div class="flex items-center space-x-2">
-          <ElButton
-            :icon="Plus"
-            size="small"
-            text
-            @click="createNewTerminal"
-          >
-            新建
-          </ElButton>
+          <ElButton :icon="Plus" size="small" text @click="createNewTerminal"> 新建 </ElButton>
 
-          <ElButton
-            :icon="Refresh"
-            size="small"
-            text
-            @click="refreshTerminal"
-          >
-            刷新
-          </ElButton>
+          <ElButton :icon="Refresh" size="small" text @click="refreshTerminal"> 刷新 </ElButton>
 
           <ElSelect
             v-model="appStore.currentShell"
@@ -352,10 +336,7 @@ function refreshTerminal() {
     </div>
 
     <!-- Terminal Area -->
-    <div
-      ref="terminalContainer"
-      class="flex-1 overflow-hidden"
-    />
+    <div ref="terminalContainer" class="flex-1 overflow-hidden" />
 
     <!-- Status Bar -->
     <div class="border-t border-border bg-surface px-4 py-1 text-xs text-text-secondary">

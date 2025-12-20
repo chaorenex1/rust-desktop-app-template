@@ -4,4 +4,4 @@ export { useUserStore } from './userStore';
 export { useFileStore } from './filesStore';
 export { useWorkspaceStore } from './WorkspaceStore';
 export { useTerminalStore } from './terminalStore';
-``
+``;

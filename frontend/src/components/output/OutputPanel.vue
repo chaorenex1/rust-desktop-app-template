@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue';
-import { ElInput, ElButton, ElSelect, ElOption, ElTooltip,ElMessageBox } from 'element-plus';
+import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElMessageBox } from 'element-plus';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 
 import { getLogs, clearLogs as clearLogsCommand } from '@/services/tauri/commands';
@@ -104,62 +104,30 @@ function togglePause() {
           class="flex-1"
         />
 
-        <ElSelect
-          v-model="logLevel"
-          size="small"
-          style="width: 100px"
-        >
-          <ElOption
-            label="全部"
-            value="all"
-          />
-          <ElOption
-            label="INFO"
-            value="info"
-          />
-          <ElOption
-            label="DEBUG"
-            value="debug"
-          />
-          <ElOption
-            label="WARN"
-            value="warn"
-          />
-          <ElOption
-            label="ERROR"
-            value="error"
-          />
+        <ElSelect v-model="logLevel" size="small" style="width: 100px">
+          <ElOption label="全部" value="all" />
+          <ElOption label="INFO" value="info" />
+          <ElOption label="DEBUG" value="debug" />
+          <ElOption label="WARN" value="warn" />
+          <ElOption label="ERROR" value="error" />
         </ElSelect>
       </div>
 
       <div class="flex items-center justify-between">
-        <div class="text-sm text-text-secondary">
-          共 {{ filteredLogs.length }} 条日志
-        </div>
+        <div class="text-sm text-text-secondary">共 {{ filteredLogs.length }} 条日志</div>
 
         <div class="flex items-center space-x-2">
-          <ElTooltip
-            :content="isPaused ? '继续输出' : '暂停输出'"
-            placement="bottom"
-          >
+          <ElTooltip :content="isPaused ? '继续输出' : '暂停输出'" placement="bottom">
             <ElButton
-		      :icon="isPaused ? VideoPlay : VideoPause"
+              :icon="isPaused ? VideoPlay : VideoPause"
               size="small"
               text
               @click="togglePause"
             />
           </ElTooltip>
 
-          <ElTooltip
-            content="清空日志"
-            placement="bottom"
-          >
-            <ElButton
-              :icon="Delete"
-              size="small"
-              text
-              @click="clearLogs"
-            />
+          <ElTooltip content="清空日志" placement="bottom">
+            <ElButton :icon="Delete" size="small" text @click="clearLogs" />
           </ElTooltip>
         </div>
       </div>
@@ -167,17 +135,11 @@ function togglePause() {
 
     <!-- Logs Area -->
     <div class="flex-1 overflow-auto p-2 font-mono text-sm logs-container">
-      <div
-        v-if="filteredLogs.length === 0"
-        class="text-center p-4 text-text-secondary"
-      >
+      <div v-if="filteredLogs.length === 0" class="text-center p-4 text-text-secondary">
         {{ searchQuery || logLevel !== 'all' ? '没有匹配的日志' : '暂无日志' }}
       </div>
 
-      <div
-        v-else
-        class="space-y-1"
-      >
+      <div v-else class="space-y-1">
         <div
           v-for="(log, index) in filteredLogs"
           :key="index"

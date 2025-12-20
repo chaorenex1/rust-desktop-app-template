@@ -3,7 +3,6 @@ import { ref, computed } from 'vue';
 import type { TerminalTab } from '../utils/types';
 import { Terminal } from '@xterm/xterm';
 
-
 export const useTerminalStore = defineStore('terminal', () => {
   const terminalInstances = ref<Record<string, Terminal>>({});
   const terminals = ref<TerminalTab[]>([]);
@@ -17,7 +16,7 @@ export const useTerminalStore = defineStore('terminal', () => {
     const activeTerminal = terminals.value[activeIndex.value];
     return activeTerminal ? terminalInstances.value[activeTerminal.id] : null;
   });
-  
+
   const getActiveTerminalTab = computed(() => terminals.value[activeIndex.value]);
 
   function addTerminal(tab: TerminalTab) {

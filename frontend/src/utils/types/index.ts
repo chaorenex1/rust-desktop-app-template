@@ -1,4 +1,4 @@
-import type { Terminal } from "@xterm/xterm";
+import type { Terminal } from '@xterm/xterm';
 
 // Application types
 export interface Workspace {

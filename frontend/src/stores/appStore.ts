@@ -16,7 +16,7 @@ import {
 
 export const useAppStore = defineStore('app', () => {
   // State
-  const currentShell = ref('')
+  const currentShell = ref('');
   const currentAiModel = ref('');
   const currentCodeCli = ref('');
   const currentWorkspace = ref<Workspace>({

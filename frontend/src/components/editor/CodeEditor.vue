@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Document, FolderOpened } from '@element-plus/icons-vue';
-import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip,ElMessageBox } from 'element-plus';
+import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip, ElMessageBox } from 'element-plus';
 import monaco from '@/utils/monaco';
 import { ref, onBeforeUnmount, onBeforeUpdate, watch, nextTick, computed, toRaw } from 'vue';
 
@@ -25,27 +25,27 @@ const lastContentHash = ref<number>(0); // 内容哈希值，用于快速对比
 
 /**
  * 高效对比文件的5种方案：
- * 
+ *
  * 方案1: 简单字符串对比 (当前使用)
  *   优点: 实现简单，内存占用少
  *   缺点: 对大文件可能有性能影响
  *   场景: 适合一般文件大小的编辑
- * 
+ *
  * 方案2: 防抖处理 (当前使用)
  *   优点: 减少频繁的状态更新
  *   缺点: 有延迟
  *   场景: 避免每次敲键盘都更新
- * 
+ *
  * 方案3: 哈希值对比 (可选)
  *   优点: 大文件快速对比，O(n)时间复杂度
  *   缺点: 哈希冲突概率极低但存在
  *   场景: 超大文件编辑
- * 
+ *
  * 方案4: 变化队列收集 (可选)
  *   优点: 追踪每一次变化，支持撤销/重做
  *   缺点: 内存占用增加
  *   场景: 需要编辑历史
- * 
+ *
  * 方案5: 二进制对比 (高级)
  *   优点: 最准确，支持二进制文件
  *   缺点: 性能消耗大
@@ -61,7 +61,7 @@ function simpleHash(str: string): number {
   if (str.length === 0) return hash;
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
   return hash;
@@ -179,7 +179,7 @@ async function initialize() {
       editor.value.onDidChangeModelContent(async () => {
         if (fileStore.activeFile) {
           const content = toRaw(editor.value)?.getValue() || '';
-          
+
           // 方案1: 简单对比 - 仅当内容真的改变时才标记为脏
           // 对于大文件，可以使用哈希值对比来提高性能
           const currentHash = simpleHash(content);
@@ -187,25 +187,25 @@ async function initialize() {
             isContentDirty.value = true;
             lastContentHash.value = currentHash;
           }
-          
+
           // 或者继续使用字符串对比（更准确）
           // if (content !== lastSavedContent.value) {
           //   isContentDirty.value = true;
           // }
-          
+
           // 方案2: 防抖处理 - 避免频繁更新
           if (debounceTimer.value) {
             clearTimeout(debounceTimer.value);
           }
           debounceTimer.value = setTimeout(async () => {
             if (!isContentDirty.value) return; // 如果内容没变，不处理
-            
-            console.debug('File content changed, updating...', { 
+
+            console.debug('File content changed, updating...', {
               contentLength: content.length,
               isDirty: isContentDirty.value,
-              contentHash: simpleHash(content) // 可选：打印哈希值用于调试
+              contentHash: simpleHash(content), // 可选：打印哈希值用于调试
             });
-            
+
             if (appStore.settings.editor.autoSave) {
               await fileStore.saveFile(content);
               lastSavedContent.value = content; // 更新最后保存的内容
@@ -313,12 +313,14 @@ function closeFile(index: number) {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
-    }).then(() => {
-      fileStore.closeFile(file.path);
-    }).catch(() => {
-      // 用户取消
-      console.debug('用户取消');
-    });
+    })
+      .then(() => {
+        fileStore.closeFile(file.path);
+      })
+      .catch(() => {
+        // 用户取消
+        console.debug('用户取消');
+      });
   } else {
     fileStore.closeFile(file.path);
   }

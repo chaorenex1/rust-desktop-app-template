@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import { Link, Delete, Setting, Search, Folder, Document } from '@element-plus/icons-vue';
-import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElTag, ElDialog, ElIcon,ElMessageBox } from 'element-plus';
+import {
+  ElInput,
+  ElButton,
+  ElSelect,
+  ElOption,
+  ElTooltip,
+  ElTag,
+  ElDialog,
+  ElIcon,
+  ElMessageBox,
+} from 'element-plus';
 import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { listen } from '@tauri-apps/api/event';
 
@@ -70,7 +80,8 @@ async function setupAiResponseListener() {
     aiUnlisten = await listen<string>('ai-response', (event) => {
       try {
         const raw = event.payload;
-        const data: AiResponseEventPayload = typeof raw === 'string' ? JSON.parse(raw) : (raw as any);
+        const data: AiResponseEventPayload =
+          typeof raw === 'string' ? JSON.parse(raw) : (raw as any);
 
         if (!currentRequestId.value || data.request_id !== currentRequestId.value) return;
 
@@ -119,7 +130,7 @@ async function sendMessage() {
   const content = message.value.trim();
   const timestamp = new Date().toISOString();
   const contextFiles = [...associatedFiles.value];
-  const model = appStore.currentAiModel
+  const model = appStore.currentAiModel;
 
   // 先推送用户消息到本地列表
   messages.value.push({
@@ -162,11 +173,13 @@ function clearChat() {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning',
-  }).then(() => {
-    messages.value = [];
-  }).catch(() => {
-    // 用户取消
-  });
+  })
+    .then(() => {
+      messages.value = [];
+    })
+    .catch(() => {
+      // 用户取消
+    });
 }
 
 // Remove associated file
@@ -222,27 +235,15 @@ function confirmAssociate() {
 <template>
   <div class="h-full flex flex-col">
     <!-- Associated Files -->
-    <div
-      v-if="associatedFiles.length > 0"
-      class="border-b border-border bg-surface p-2"
-    >
+    <div v-if="associatedFiles.length > 0" class="border-b border-border bg-surface p-2">
       <div class="flex items-center justify-between mb-1">
         <div class="flex items-center text-sm text-text-secondary">
-          <ElIcon
-            :size="14"
-            class="mr-1"
-          >
+          <ElIcon :size="14" class="mr-1">
             <Link />
           </ElIcon>
           关联文件:
         </div>
-        <ElButton
-          size="small"
-          text
-	      @click="openAssociateDialog(true)"
-        >
-          添加当前文件
-        </ElButton>
+        <ElButton size="small" text @click="openAssociateDialog(true)"> 添加当前文件 </ElButton>
       </div>
       <div class="flex flex-wrap gap-1">
         <ElTag
@@ -252,27 +253,18 @@ function confirmAssociate() {
           closable
           @close="removeAssociatedFile(index)"
         >
-	      {{ getFileName(file) }}
+          {{ getFileName(file) }}
         </ElTag>
       </div>
     </div>
 
     <!-- Chat Messages Area -->
-    <div
-	  ref="messagesContainer"
-	  class="flex-1 overflow-auto p-4 space-y-3 bg-surface/50"
-	>
-      <div
-        v-if="messages.length === 0"
-        class="text-center text-text-secondary"
-      >
+    <div ref="messagesContainer" class="flex-1 overflow-auto p-4 space-y-3 bg-surface/50">
+      <div v-if="messages.length === 0" class="text-center text-text-secondary">
         暂无消息，输入内容开始对话。
       </div>
 
-      <div
-        v-else
-        class="space-y-3"
-      >
+      <div v-else class="space-y-3">
         <div
           v-for="msg in messages"
           :key="msg.id"
@@ -304,7 +296,12 @@ function confirmAssociate() {
             </div>
 
             <div class="mt-1 text-[11px] opacity-70 text-right">
-              {{ new Date(msg.timestamp).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }) }}
+              {{
+                new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              }}
             </div>
           </div>
         </div>
@@ -352,28 +349,12 @@ function confirmAssociate() {
         </div>
 
         <div class="flex items-center space-x-2">
-          <ElTooltip
-            content="关联当前文件"
-            placement="bottom"
-          >
-            <ElButton
-              :icon="Link"
-              size="small"
-              text
-	        @click="openAssociateDialog(true)"
-            />
+          <ElTooltip content="关联当前文件" placement="bottom">
+            <ElButton :icon="Link" size="small" text @click="openAssociateDialog(true)" />
           </ElTooltip>
 
-          <ElTooltip
-            content="清空聊天"
-            placement="bottom"
-          >
-            <ElButton
-              :icon="Delete"
-              size="small"
-              text
-              @click="clearChat"
-            />
+          <ElTooltip content="清空聊天" placement="bottom">
+            <ElButton :icon="Delete" size="small" text @click="clearChat" />
           </ElTooltip>
         </div>
       </div>
@@ -390,12 +371,7 @@ function confirmAssociate() {
           @keydown="handleKeyPress"
         />
 
-        <ElButton
-          type="primary"
-          :icon="Setting"
-          :loading="isLoading"
-          @click="sendMessage"
-        >
+        <ElButton type="primary" :icon="Setting" :loading="isLoading" @click="sendMessage">
           发送
         </ElButton>
       </div>
@@ -411,11 +387,7 @@ function confirmAssociate() {
   </div>
 
   <!-- 关联文件弹窗 -->
-  <ElDialog
-    v-model="showAssociateDialog"
-    title="关联文件"
-    width="640px"
-  >
+  <ElDialog v-model="showAssociateDialog" title="关联文件" width="640px">
     <!-- 搜索栏 -->
     <div class="mb-3">
       <ElInput
@@ -431,7 +403,9 @@ function confirmAssociate() {
       <!-- 正在编辑 -->
       <div>
         <div class="mb-2 text-xs font-semibold text-text-secondary">正在编辑</div>
-        <div v-if="!filteredEditingFiles.length" class="text-xs text-text-secondary">暂无正在编辑的文件</div>
+        <div v-if="!filteredEditingFiles.length" class="text-xs text-text-secondary">
+          暂无正在编辑的文件
+        </div>
         <div v-else class="space-y-1">
           <div
             v-for="file in filteredEditingFiles"
@@ -453,9 +427,13 @@ function confirmAssociate() {
       <div>
         <div class="mb-2 text-xs font-semibold text-text-secondary">
           文件和文件夹
-          <span class="ml-1 text-[11px] text-text-secondary/70">(当前目录: {{ fileStore.currentDirectory }})</span>
+          <span class="ml-1 text-[11px] text-text-secondary/70"
+            >(当前目录: {{ fileStore.currentDirectory }})</span
+          >
         </div>
-        <div v-if="!filteredDirectoryFiles.length" class="text-xs text-text-secondary">当前目录暂无文件/文件夹</div>
+        <div v-if="!filteredDirectoryFiles.length" class="text-xs text-text-secondary">
+          当前目录暂无文件/文件夹
+        </div>
         <div v-else class="space-y-1">
           <div
             v-for="file in filteredDirectoryFiles"
@@ -476,7 +454,9 @@ function confirmAssociate() {
       <!-- 最近关联的文件 -->
       <div>
         <div class="mb-2 text-xs font-semibold text-text-secondary">最近关联的文件</div>
-        <div v-if="!filteredRecentFiles.length" class="text-xs text-text-secondary">暂无最近关联的文件</div>
+        <div v-if="!filteredRecentFiles.length" class="text-xs text-text-secondary">
+          暂无最近关联的文件
+        </div>
         <div v-else class="flex flex-wrap gap-1 text-[11px]">
           <span
             v-for="file in filteredRecentFiles"
@@ -494,9 +474,7 @@ function confirmAssociate() {
 
     <template #footer>
       <div class="flex items-center justify-between w-full">
-        <div class="text-xs text-text-secondary">
-          已选择 {{ selectedPaths.length }} 个文件
-        </div>
+        <div class="text-xs text-text-secondary">已选择 {{ selectedPaths.length }} 个文件</div>
         <div>
           <ElButton size="small" @click="showAssociateDialog = false">取消</ElButton>
           <ElButton type="primary" size="small" @click="confirmAssociate">确定</ElButton>

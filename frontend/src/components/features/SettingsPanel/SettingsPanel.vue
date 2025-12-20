@@ -15,7 +15,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 
-import { useAppStore } from '@/stores/workspaceStore';
+import { useAppStore } from '@/stores/appStore';
 import { useFileStore } from '@/stores/filesStore';
 import {
   getSettings,
