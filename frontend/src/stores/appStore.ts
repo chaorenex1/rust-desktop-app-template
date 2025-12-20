@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { invoke } from '@tauri-apps/api/core';
-import type { UnlistenFn } from '@tauri-apps/api/event';
 import type { AppSettings, Workspace } from '@/utils/types';
 import { normalizePath, getDirectoryName } from '@/utils/pathUtils';
 import {
@@ -13,11 +12,12 @@ import {
   createWorkspace as createWorkspaceCommand,
   switchWorkspace as switchWorkspaceCommand,
 } from '@/services/tauri/commands';
-import { de } from 'element-plus/es/locales.mjs';
 // import {} from '@/services/tauri/events';
 
 export const useAppStore = defineStore('app', () => {
   // State
+  const currentAiModel = ref('');
+  const currentCodeCli = ref('');
   const currentWorkspace = ref<Workspace>({
     id: '',
     name: '',
@@ -77,6 +77,8 @@ export const useAppStore = defineStore('app', () => {
   // Getters
   const themeClass = computed(() => settings.value.theme);
   const fontSizeStyle = computed(() => `${settings.value.editor.fontSize}px`);
+  const availableAiModels = computed(() => settings.value.ai.model_list);
+  const availableCodeClis = computed(() => settings.value.ai.code_cli);
   // Actions
   async function initialize() {
     isLoading.value = true;
@@ -96,6 +98,7 @@ export const useAppStore = defineStore('app', () => {
           await saveSettings(JSON.stringify(settings.value));
           console.warn('No settings received from backend, using defaults.');
         }
+        currentAiModel.value = settings.value.ai.defaultModel;
       } catch (err) {
         console.warn('Failed to load settings from backend, using defaults:', err);
       }
@@ -206,21 +209,36 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
-  function resetToDefaults() {
+  function setCurrentAiModel(model: string) {
+    currentAiModel.value = model;
+    saveToStorage();
+  }
+
+  function setCurrentCodeCli(cli: string) {
+    currentCodeCli.value = cli;
+    saveToStorage();
+  }
+
+  async function resetToDefaults() {
     settings.value = defaultSettings.value;
     saveToStorage();
+    await saveSettings(JSON.stringify(settings.value));
   }
 
   const saveToStorage = () => {
     localStorage.setItem('appSettings', JSON.stringify(settings.value));
     localStorage.setItem('currentWorkspace', JSON.stringify(currentWorkspace.value));
     localStorage.setItem('workspaces', JSON.stringify(workspaces.value));
+    localStorage.setItem('currentAiModel', JSON.stringify(currentAiModel.value));
+    localStorage.setItem('currentCodeCli', JSON.stringify(currentCodeCli.value));
   };
 
   const loadFromStorage = () => {
     const storedSettings = localStorage.getItem('appSettings');
     const storedCurrentWorkspace = localStorage.getItem('currentWorkspace');
     const storedWorkspaces = localStorage.getItem('workspaces');
+    const storedCurrentAiModel = localStorage.getItem('currentAiModel');
+    const storedCurrentCodeCli = localStorage.getItem('currentCodeCli');
     if (storedCurrentWorkspace) {
       currentWorkspace.value = JSON.parse(storedCurrentWorkspace);
     }
@@ -230,10 +248,18 @@ export const useAppStore = defineStore('app', () => {
     if (storedSettings) {
       settings.value = JSON.parse(storedSettings);
     }
+    if (storedCurrentAiModel) {
+      currentAiModel.value = JSON.parse(storedCurrentAiModel);
+    }
+    if (storedCurrentCodeCli) {
+      currentCodeCli.value = JSON.parse(storedCurrentCodeCli);
+    }
   };
 
   return {
     // State
+    currentAiModel,
+    currentCodeCli,
     currentWorkspace,
     isConnected,
     isLoading,
@@ -244,6 +270,8 @@ export const useAppStore = defineStore('app', () => {
     // Getters
     themeClass,
     fontSizeStyle,
+    availableAiModels,
+    availableCodeClis,
 
     // Actions
     initialize,
@@ -252,5 +280,8 @@ export const useAppStore = defineStore('app', () => {
     switchWorkspace,
     createWorkspace,
     deleteWorkspace,
+    setCurrentAiModel,
+    setCurrentCodeCli,
+    resetToDefaults,
   };
 });
