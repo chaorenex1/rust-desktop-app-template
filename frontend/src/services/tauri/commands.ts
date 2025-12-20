@@ -130,7 +130,7 @@ export async function spawnTerminal(cwd?: string): Promise<string> {
 }
 
 export async function killTerminal(sessionId: string): Promise<void> {
-  return invoke('kill_terminal', { terminal_id: sessionId });
+  return invoke('kill_terminal', { terminalId: sessionId });
 }
 
 // Settings commands

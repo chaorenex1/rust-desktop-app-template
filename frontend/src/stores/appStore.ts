@@ -16,6 +16,7 @@ import {
 
 export const useAppStore = defineStore('app', () => {
   // State
+  const currentShell = ref('')
   const currentAiModel = ref('');
   const currentCodeCli = ref('');
   const currentWorkspace = ref<Workspace>({
@@ -219,6 +220,11 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage();
   }
 
+  function setCurrentShell(shell: string) {
+    currentShell.value = shell;
+    saveToStorage();
+  }
+
   async function resetToDefaults() {
     settings.value = defaultSettings.value;
     saveToStorage();
@@ -231,6 +237,7 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('workspaces', JSON.stringify(workspaces.value));
     localStorage.setItem('currentAiModel', JSON.stringify(currentAiModel.value));
     localStorage.setItem('currentCodeCli', JSON.stringify(currentCodeCli.value));
+    localStorage.setItem('currentShell', JSON.stringify(currentShell.value));
   };
 
   const loadFromStorage = () => {
@@ -239,6 +246,7 @@ export const useAppStore = defineStore('app', () => {
     const storedWorkspaces = localStorage.getItem('workspaces');
     const storedCurrentAiModel = localStorage.getItem('currentAiModel');
     const storedCurrentCodeCli = localStorage.getItem('currentCodeCli');
+    const storedCurrentShell = localStorage.getItem('currentShell');
     if (storedCurrentWorkspace) {
       currentWorkspace.value = JSON.parse(storedCurrentWorkspace);
     }
@@ -247,6 +255,9 @@ export const useAppStore = defineStore('app', () => {
     }
     if (storedSettings) {
       settings.value = JSON.parse(storedSettings);
+    }
+    if (storedCurrentShell) {
+      currentShell.value = JSON.parse(storedCurrentShell);
     }
     if (storedCurrentAiModel) {
       currentAiModel.value = JSON.parse(storedCurrentAiModel);
@@ -258,6 +269,7 @@ export const useAppStore = defineStore('app', () => {
 
   return {
     // State
+    currentShell,
     currentAiModel,
     currentCodeCli,
     currentWorkspace,
@@ -282,6 +294,7 @@ export const useAppStore = defineStore('app', () => {
     deleteWorkspace,
     setCurrentAiModel,
     setCurrentCodeCli,
+    setCurrentShell,
     resetToDefaults,
   };
 });

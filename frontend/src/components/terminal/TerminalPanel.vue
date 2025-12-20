@@ -1,55 +1,69 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
-import { Plus, Close, Refresh } from '@element-plus/icons-vue';
+import { Plus, Refresh } from '@element-plus/icons-vue';
 import { ElTabs, ElTabPane, ElButton, ElSelect, ElOption } from 'element-plus';
-import { useAppStore } from '../../stores/appStore';
-import { showError } from '@/utils/toast';
+import type { TabsPaneContext, TabPaneName } from 'element-plus';
+
+import { useAppStore, useTerminalStore } from '@/stores';
+import type { TerminalTab } from '@/utils/types';
+import { spawnTerminal, killTerminal, executeTerminalCommand } from '@/services/tauri/commands';
 
 const appStore = useAppStore();
+const terminalStore = useTerminalStore();
+const isWindows = navigator.userAgent.includes('Windows');
+const shellOptions = computed(() =>
+  isWindows
+    ? [
+        { label: 'PowerShell', value: 'powershell' },
+        { label: 'cmd', value: 'cmd' },
+      ]
+    : [
+        { label: 'bash', value: 'bash' },
+        { label: 'zsh', value: 'zsh' },
+      ],
+);
 const terminalContainer = ref<HTMLElement>();
-const terminals = ref<{ id: string; name: string; terminal: Terminal }[]>([]);
-const activeTerminalIndex = ref(0);
-const fitAddon = ref<FitAddon>();
+// 仅在组件中保存 xterm 实例映射，真正的数据（id/name/sessionId、当前激活索引）放到 Pinia store 中
+const terminalInstances = computed(() => terminalStore.terminalInstances);
+const terminals = computed(() => terminalStore.terminals);
+const activeTerminalIndex = computed<TabPaneName>({
+  get() {
+    return terminalStore.activeIndex;
+  },
+  set(value: TabPaneName) {
+    const idx = typeof value === 'number' ? value : Number(value);
+    if (!Number.isNaN(idx)) {
+      terminalStore.setActiveIndex(idx);
+    }
+  },
+});
 
 // Initialize terminal
 onMounted(() => {
   createNewTerminal();
-
-  // Listen for open-terminal-in-path event
-  window.addEventListener('open-terminal-in-path', handleOpenTerminalInPath);
 });
 
 // Cleanup on unmount
 onUnmounted(() => {
-  terminals.value.forEach((term) => {
-    term.terminal.dispose();
-  });
-
-  // Clean up event listener
-  window.removeEventListener('open-terminal-in-path', handleOpenTerminalInPath);
+  terminalStore.clear();
 });
 
-// Handle opening terminal in specific path
-function handleOpenTerminalInPath(event: Event) {
-  const customEvent = event as CustomEvent;
-  const path = customEvent.detail?.path;
+// Create new terminal (with backend session)
+async function createNewTerminal() {
+  const name = `终端 ${terminalStore.terminals.length + 1}`;
 
-  if (path) {
-    createNewTerminal(path);
+  // Create backend terminal session
+  let sessionId: string;
+  try {
+    sessionId = await spawnTerminal('.');
+  } catch (error) {
+    console.error('Failed to spawn terminal session:', error);
+    return;
   }
-}
-
-// Create new terminal
-function createNewTerminal(workingDirectory?: string) {
-  const id = `terminal-${Date.now()}`;
-  const name = workingDirectory
-    ? `终端 (${workingDirectory.split(/[\\/]/).pop()})`
-    : `终端 ${terminals.value.length + 1}`;
 
   // Create terminal instance
   const terminal = new Terminal({
@@ -75,9 +89,14 @@ function createNewTerminal(workingDirectory?: string) {
   terminal.loadAddon(fitAddonInstance);
   terminal.loadAddon(webLinksAddon);
 
-  // Store terminal
-  terminals.value.push({ id, name, terminal });
-  activeTerminalIndex.value = terminals.value.length - 1;
+  // Store terminal metadata and keep xterm instance locally
+  terminalStore.addTerminal({ id: sessionId, name, sessionId, terminal });
+  if (isWindows){
+    appStore.setCurrentShell('powershell');
+  }else{
+    appStore.setCurrentShell('bash');
+  }
+
 
   // Initialize terminal after DOM update
   nextTick(() => {
@@ -88,53 +107,102 @@ function createNewTerminal(workingDirectory?: string) {
 
       // Write welcome message
       terminal.writeln('\x1b[1;32m欢迎使用 Code AI Assistant 终端\x1b[0m');
-      if (workingDirectory) {
-        terminal.writeln(`工作目录: ${workingDirectory}`);
-      }
       terminal.writeln('输入 "help" 查看可用命令');
       terminal.writeln('');
 
-      // Set up command handling
-      setupCommandHandling(terminal, workingDirectory);
+      // Set up command handling bound to this backend session
+      setupCommandHandling(terminal, sessionId);
     }
   });
 }
 
-// Set up command handling
-function setupCommandHandling(terminal: Terminal, workingDirectory?: string) {
+// Set up command handling（带简单历史）
+function setupCommandHandling(terminal: Terminal, sessionId: string) {
   let command = '';
+  const history: string[] = [];
+  let historyIndex = -1;
 
-  terminal.onData((data) => {
-    if (data === '\r') {
-      // Enter key
-      terminal.writeln('');
-      handleCommand(command, terminal, workingDirectory);
-      command = '';
-      terminal.write('$ ');
-    } else if (data === '\u007F') {
-      // Backspace
-      if (command.length > 0) {
-        command = command.slice(0, -1);
-        terminal.write('\b \b');
+  const prompt = () => {
+    terminal.write('$ ');
+  };
+
+  const eraseCurrentInput = () => {
+    for (let i = 0; i < command.length; i += 1) {
+      terminal.write('\b \b');
+    }
+  };
+
+  terminal.onKey(async ({ key, domEvent }) => {
+    const printable =
+      !domEvent.altKey &&
+      !domEvent.ctrlKey &&
+      !domEvent.metaKey &&
+      domEvent.key.length === 1;
+
+    switch (domEvent.key) {
+      case 'Enter': {
+        terminal.writeln('');
+        await handleCommand(command, terminal, sessionId);
+        if (command.trim()) {
+          history.push(command);
+          historyIndex = history.length;
+        }
+        command = '';
+        prompt();
+        break;
       }
-    } else if (data === '\u0003') {
-      // Ctrl+C
-      terminal.writeln('^C');
-      command = '';
-      terminal.write('$ ');
-    } else if (data >= ' ' && data <= '~') {
-      // Printable characters
-      command += data;
-      terminal.write(data);
+      case 'Backspace': {
+        if (command.length > 0) {
+          command = command.slice(0, -1);
+          terminal.write('\b \b');
+        }
+        break;
+      }
+      case 'ArrowUp': {
+        if (history.length === 0) break;
+        if (historyIndex > 0) {
+          historyIndex -= 1;
+        } else {
+          historyIndex = 0;
+        }
+        eraseCurrentInput();
+        command = history[historyIndex] ?? '';
+        terminal.write(command);
+        break;
+      }
+      case 'ArrowDown': {
+        if (history.length === 0) break;
+        if (historyIndex < history.length - 1) {
+          historyIndex += 1;
+          command = history[historyIndex] ?? '';
+        } else {
+          historyIndex = history.length;
+          command = '';
+        }
+        eraseCurrentInput();
+        terminal.write(command);
+        break;
+      }
+      default: {
+        if (domEvent.ctrlKey && (domEvent.key === 'c' || domEvent.key === 'C')) {
+          terminal.writeln('^C');
+          command = '';
+          prompt();
+        } else if (printable) {
+          command += key;
+          terminal.write(key);
+        }
+        break;
+      }
     }
   });
 
   // Initial prompt
-  terminal.write('$ ');
+  prompt();
 }
 
 // Handle command execution
-async function handleCommand(command: string, terminal: Terminal, workingDirectory?: string) {
+async function handleCommand(command: string, terminal: Terminal, sessionId: string) {
   const trimmedCommand = command.trim();
 
   if (!trimmedCommand) {
@@ -160,60 +228,69 @@ async function handleCommand(command: string, terminal: Terminal, workingDirecto
   }
 
   if (trimmedCommand === 'exit') {
-    const index = terminals.value.findIndex((t) => t.terminal === terminal);
+    const index = terminals.value.findIndex((t: TerminalTab) => terminalInstances.value[t.id] === terminal);
     if (index >= 0) {
       closeTerminal(index);
     }
     return;
   }
 
-  // Execute command via Tauri
+  // Execute command via backend terminal session
   try {
-    const [cmd, ...args] = trimmedCommand.split(' ');
-    const result = await invoke('execute_command', {
-      command: cmd,
-      args,
-      cwd: workingDirectory || '.',
-    });
+    const shell = appStore.currentShell;
+    const result = await executeTerminalCommand(sessionId as string, shell, trimmedCommand);
 
     if (result) {
       terminal.writeln(result);
     }
   } catch (error) {
     terminal.writeln(`\x1b[1;31m错误: ${error}\x1b[0m`);
-    showError(error instanceof Error ? error.message : '命令执行失败', '终端错误');
   }
 
   terminal.write('$ ');
 }
 
 // Close terminal
-function closeTerminal(index: number) {
-  if (terminals.value[index]) {
-    terminals.value[index].terminal.dispose();
-    terminals.value.splice(index, 1);
+function closeTerminal(name: TabPaneName) {
+  const index = typeof name === 'number' ? name : Number(name);
+  const term = terminals.value[index];
+  if (term) {
+    // Best-effort attempt to kill backend session
+    void killTerminal(term.sessionId).catch((err) => {
+      console.error('Failed to kill terminal session:', err);
+    });
 
-    if (terminals.value.length === 0) {
-      createNewTerminal();
-    } else if (activeTerminalIndex.value >= terminals.value.length) {
-      activeTerminalIndex.value = terminals.value.length - 1;
+    const instance = terminalInstances.value[term.id];
+    if (instance) {
+      instance.dispose();
+      delete terminalInstances.value[term.id];
     }
+
+    terminalStore.removeTerminal(index);
+
+    // if (terminalStore.terminals.length === 0) {
+    //   createNewTerminal();
+    // }
   }
 }
 
 // Switch terminal
-function switchTerminal(index: number) {
-  activeTerminalIndex.value = index;
+function switchTerminal(pane: TabsPaneContext) {
+  const index = typeof pane.paneName === 'number' ? pane.paneName : Number(pane.paneName);
+  if (!Number.isNaN(index)) {
+    terminalStore.setActiveIndex(index);
+  }
 }
 
 // Refresh terminal
 function refreshTerminal() {
-  const terminal = terminals.value[activeTerminalIndex.value]?.terminal;
+  const activeIndex = terminalStore.activeIndex;
+  const termMeta = terminals.value[activeIndex];
+  const terminal = termMeta ? terminalInstances.value[termMeta.id] : undefined;
   if (terminal) {
     terminal.clear();
     terminal.writeln('\x1b[1;32m终端已刷新\x1b[0m');
     terminal.writeln('');
-    terminal.write('$ ');
   }
 }
 </script>
@@ -239,35 +316,54 @@ function refreshTerminal() {
         </ElTabs>
 
         <div class="flex items-center space-x-2">
-          <ElButton :icon="Plus" size="small" text @click="createNewTerminal"> 新建 </ElButton>
+          <ElButton
+            :icon="Plus"
+            size="small"
+            text
+            @click="createNewTerminal"
+          >
+            新建
+          </ElButton>
 
-          <ElButton :icon="Refresh" size="small" text @click="refreshTerminal"> 刷新 </ElButton>
+          <ElButton
+            :icon="Refresh"
+            size="small"
+            text
+            @click="refreshTerminal"
+          >
+            刷新
+          </ElButton>
 
           <ElSelect
-            v-model="appStore.settings.terminalShell"
+            v-model="appStore.currentShell"
             size="small"
             style="width: 100px"
-            @change="appStore.setTerminalShell"
+            @change="appStore.setCurrentShell"
           >
-            <ElOption label="bash" value="bash" />
-            <ElOption label="zsh" value="zsh" />
-            <ElOption label="powershell" value="powershell" />
-            <ElOption label="cmd" value="cmd" />
+            <ElOption
+              v-for="opt in shellOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </ElSelect>
         </div>
       </div>
     </div>
 
     <!-- Terminal Area -->
-    <div ref="terminalContainer" class="flex-1 overflow-hidden"></div>
+    <div
+      ref="terminalContainer"
+      class="flex-1 overflow-hidden"
+    />
 
     <!-- Status Bar -->
     <div class="border-t border-border bg-surface px-4 py-1 text-xs text-text-secondary">
       <div class="flex items-center justify-between">
         <div>
-          <span>终端: {{ terminals[activeTerminalIndex]?.name || '' }}</span>
+          <span>终端: {{ terminals[Number(activeTerminalIndex)]?.name || '' }}</span>
           <span class="mx-2">|</span>
-          <span>Shell: {{ appStore.settings.terminalShell }}</span>
+          <span>Shell: {{ appStore.currentShell }}</span>
         </div>
 
         <div>

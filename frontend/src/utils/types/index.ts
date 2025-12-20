@@ -1,3 +1,5 @@
+import type { Terminal } from "@xterm/xterm";
+
 // Application types
 export interface Workspace {
   id: string;
@@ -238,6 +240,13 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+export interface TerminalTab {
+  id: string;
+  name: string;
+  sessionId: string;
+  terminal: Terminal;
 }
 
 // Utility types
