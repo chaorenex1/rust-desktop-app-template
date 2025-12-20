@@ -237,15 +237,14 @@ pub async fn get_system_info() -> Result<serde_json::Value, String> {
 /// Get application logs from the configured log file
 #[tauri::command]
 pub async fn get_logs(state: State<'_, AppState>, limit: Option<usize>) -> Result<Vec<String>, String> {
-    info!("Getting application logs");
-
+    let date = chrono::Local::now().format("%Y-%m-%d");
     let path = {
         let cfg = state.config.lock().map_err(|e| e.to_string())?;
         let mut p = PathBuf::from(&cfg.logging.log_file_path);
-        p.push(&cfg.logging.log_file_name);
+        let filename = format!("{}.{}", cfg.logging.log_file_name, date);
+        p.push(&filename);
         p
     };
-
     async_runtime::spawn_blocking(move || {
         if !path.exists() {
             return Ok(Vec::new());

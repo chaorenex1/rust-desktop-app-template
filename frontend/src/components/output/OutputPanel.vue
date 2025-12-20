@@ -1,23 +1,52 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
 import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue';
-import { ElInput, ElButton, ElSelect, ElOption, ElTooltip } from 'element-plus';
-import { showConfirm } from '@/utils/toast';
+import { ElInput, ElButton, ElSelect, ElOption, ElTooltip,ElMessageBox } from 'element-plus';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 
-const logs = ref<string[]>([
-  '2024-01-15 10:30:25 INFO - 应用启动成功',
-  '2024-01-15 10:30:26 DEBUG - 加载配置文件: config.toml',
-  '2024-01-15 10:30:27 INFO - 数据库连接成功',
-  '2024-01-15 10:30:28 ERROR - 文件读取失败: /path/to/file',
-  '2024-01-15 10:30:29 INFO - AI模型加载完成: claude-3-5-sonnet',
-  '2024-01-15 10:30:30 INFO - 终端初始化完成',
-  '2024-01-15 10:30:31 DEBUG - 监听文件变化',
-  '2024-01-15 10:30:32 INFO - 工作区加载完成: default',
-]);
+import { getLogs, clearLogs as clearLogsCommand } from '@/services/tauri/commands';
+
+const logs = ref<string[]>([]);
 
 const searchQuery = ref('');
 const logLevel = ref('all');
 const isPaused = ref(false);
+
+let refreshTimer: number | null = null;
+
+// 从后端加载日志
+async function loadLogs() {
+  try {
+    const data = await getLogs();
+    logs.value = data;
+  } catch (error) {
+    console.error('加载日志失败:', error);
+  }
+}
+
+function startAutoRefresh() {
+  if (refreshTimer !== null) return;
+  refreshTimer = window.setInterval(() => {
+    if (!isPaused.value) {
+      loadLogs();
+    }
+  }, 10000);
+}
+
+function stopAutoRefresh() {
+  if (refreshTimer !== null) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+onMounted(() => {
+  loadLogs();
+  startAutoRefresh();
+});
+
+onUnmounted(() => {
+  stopAutoRefresh();
+});
 
 // Filter logs based on search and level
 const filteredLogs = computed(() => {
@@ -40,9 +69,18 @@ const filteredLogs = computed(() => {
 });
 
 // Clear logs
-function clearLogs() {
-  showConfirm('确定要清空所有日志吗？', () => {
-    logs.value = [];
+async function clearLogs() {
+  ElMessageBox.confirm('确定要清空所有日志吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  }).then(async () => {
+    try {
+      // await clearLogsCommand();
+      logs.value = [];
+    } catch (error) {
+      console.error('清空日志失败:', error);
+    }
   });
 }
 
@@ -53,7 +91,7 @@ function togglePause() {
 </script>
 
 <template>
-  <div class="h-full flex flex-col">
+  <div class="h-full flex flex-col output-panel">
     <!-- Toolbar -->
     <div class="border-b border-border bg-surface p-2">
       <div class="flex items-center space-x-2 mb-2">
@@ -66,37 +104,80 @@ function togglePause() {
           class="flex-1"
         />
 
-        <ElSelect v-model="logLevel" size="small" style="width: 100px">
-          <ElOption label="全部" value="all" />
-          <ElOption label="INFO" value="info" />
-          <ElOption label="DEBUG" value="debug" />
-          <ElOption label="WARN" value="warn" />
-          <ElOption label="ERROR" value="error" />
+        <ElSelect
+          v-model="logLevel"
+          size="small"
+          style="width: 100px"
+        >
+          <ElOption
+            label="全部"
+            value="all"
+          />
+          <ElOption
+            label="INFO"
+            value="info"
+          />
+          <ElOption
+            label="DEBUG"
+            value="debug"
+          />
+          <ElOption
+            label="WARN"
+            value="warn"
+          />
+          <ElOption
+            label="ERROR"
+            value="error"
+          />
         </ElSelect>
       </div>
 
       <div class="flex items-center justify-between">
-        <div class="text-sm text-text-secondary">共 {{ filteredLogs.length }} 条日志</div>
+        <div class="text-sm text-text-secondary">
+          共 {{ filteredLogs.length }} 条日志
+        </div>
 
         <div class="flex items-center space-x-2">
-          <ElTooltip :content="isPaused ? '继续输出' : '暂停输出'" placement="bottom">
-            <ElButton :icon="isPaused ? Play : Pause" size="small" text @click="togglePause" />
+          <ElTooltip
+            :content="isPaused ? '继续输出' : '暂停输出'"
+            placement="bottom"
+          >
+            <ElButton
+		      :icon="isPaused ? VideoPlay : VideoPause"
+              size="small"
+              text
+              @click="togglePause"
+            />
           </ElTooltip>
 
-          <ElTooltip content="清空日志" placement="bottom">
-            <ElButton :icon="Delete" size="small" text @click="clearLogs" />
+          <ElTooltip
+            content="清空日志"
+            placement="bottom"
+          >
+            <ElButton
+              :icon="Delete"
+              size="small"
+              text
+              @click="clearLogs"
+            />
           </ElTooltip>
         </div>
       </div>
     </div>
 
     <!-- Logs Area -->
-    <div class="flex-1 overflow-auto p-2 font-mono text-sm">
-      <div v-if="filteredLogs.length === 0" class="text-center p-4 text-text-secondary">
+    <div class="flex-1 overflow-auto p-2 font-mono text-sm logs-container">
+      <div
+        v-if="filteredLogs.length === 0"
+        class="text-center p-4 text-text-secondary"
+      >
         {{ searchQuery || logLevel !== 'all' ? '没有匹配的日志' : '暂无日志' }}
       </div>
 
-      <div v-else class="space-y-1">
+      <div
+        v-else
+        class="space-y-1"
+      >
         <div
           v-for="(log, index) in filteredLogs"
           :key="index"
@@ -118,5 +199,14 @@ function togglePause() {
 <style scoped>
 :deep(.el-select) {
   width: 100px;
+}
+
+.output-panel {
+  min-width: 0;
+}
+
+.logs-container {
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 </style>
