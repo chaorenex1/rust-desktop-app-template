@@ -45,11 +45,7 @@ export function getParentDirectory(path: string): string {
  * @returns Joined path
  */
 export function joinPath(...segments: string[]): string {
-  return segments
-    .map(normalizePath)
-    .filter(Boolean)
-    .join('/')
-    .replace(/\/+/g, '/'); // Replace multiple slashes with single slash
+  return segments.map(normalizePath).filter(Boolean).join('/').replace(/\/+/g, '/'); // Replace multiple slashes with single slash
 }
 
 /**

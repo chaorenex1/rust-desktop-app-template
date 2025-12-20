@@ -276,6 +276,21 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
+  async function updateFileContent(content: string) {
+    if (activeFileIndex.value >= 0) {
+      const existing = openedFiles.value[activeFileIndex.value]!;
+      openedFiles.value[activeFileIndex.value] = {
+        name: existing.name,
+        path: existing.path,
+        content,
+        language: existing.language,
+        lineCount: existing.lineCount,
+        size: existing.size,
+        modified: true,
+      };
+    }
+  }
+
   // 从磁盘刷新当前活动文件内容（不标记为已修改）
   function refreshActiveFileContentFromDisk(content: string) {
     if (activeFileIndex.value >= 0) {
@@ -439,5 +454,6 @@ export const useFileStore = defineStore('files', () => {
     setRootDirectory,
     clearDirectoryCache,
     removeDirectoryCache,
+    updateFileContent,
   };
 });

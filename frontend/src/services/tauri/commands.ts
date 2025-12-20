@@ -258,8 +258,8 @@ export async function withErrorHandling<T>(
 }
 
 // Batch operations
-export async function batchReadFiles(paths: string[]): Promise<Record<string, string>> {
-  const results: Record<string, string> = {};
+export async function batchReadFiles(paths: string[]): Promise<Record<string, FileContent>> {
+  const results: Record<string, FileContent> = {};
 
   for (const path of paths) {
     try {

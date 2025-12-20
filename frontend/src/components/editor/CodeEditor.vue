@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Document, FolderOpened } from '@element-plus/icons-vue';
-import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip } from 'element-plus';
+import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip,ElMessageBox } from 'element-plus';
 import monaco from '@/utils/monaco';
 import { ref, onBeforeUnmount, onBeforeUpdate, watch, nextTick, computed, toRaw } from 'vue';
 
@@ -15,7 +15,57 @@ const appStore = useAppStore();
 const editorContainer = ref<HTMLElement>();
 const editor = ref<monaco.editor.IStandaloneCodeEditor>();
 const isLoading = ref(false);
-const contentChangeDisposable = ref<monaco.IDisposable>(); // 存储事件监听器
+
+// 用于高效对比文件变化的状态
+const lastSavedContent = ref<string>(''); // 最后保存的内容
+const debounceTimer = ref<NodeJS.Timeout>(); // 防抖定时器
+const isContentDirty = ref<boolean>(false); // 内容是否真的改变了
+const contentChangeQueue = ref<{ content: string; timestamp: number }[]>([]); // 变化队列
+const lastContentHash = ref<number>(0); // 内容哈希值，用于快速对比
+
+/**
+ * 高效对比文件的5种方案：
+ * 
+ * 方案1: 简单字符串对比 (当前使用)
+ *   优点: 实现简单，内存占用少
+ *   缺点: 对大文件可能有性能影响
+ *   场景: 适合一般文件大小的编辑
+ * 
+ * 方案2: 防抖处理 (当前使用)
+ *   优点: 减少频繁的状态更新
+ *   缺点: 有延迟
+ *   场景: 避免每次敲键盘都更新
+ * 
+ * 方案3: 哈希值对比 (可选)
+ *   优点: 大文件快速对比，O(n)时间复杂度
+ *   缺点: 哈希冲突概率极低但存在
+ *   场景: 超大文件编辑
+ * 
+ * 方案4: 变化队列收集 (可选)
+ *   优点: 追踪每一次变化，支持撤销/重做
+ *   缺点: 内存占用增加
+ *   场景: 需要编辑历史
+ * 
+ * 方案5: 二进制对比 (高级)
+ *   优点: 最准确，支持二进制文件
+ *   缺点: 性能消耗大
+ *   场景: 多格式文件支持
+ */
+
+/**
+ * 计算字符串的简单哈希值
+ * 用于快速判断内容是否改变
+ */
+function simpleHash(str: string): number {
+  let hash = 0;
+  if (str.length === 0) return hash;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return hash;
+}
 
 // 处理路径，兼容 Windows 和 POSIX
 function getFileNameFromPath(path: string): string {
@@ -62,7 +112,7 @@ watch(
     if (newIndex === oldIndex) return;
 
     const newFile = fileStore.activeFile;
-
+    console.debug('Active file changed:', newFile?.path, newIndex, oldIndex);
     if (newFile) {
       await initialize();
       if (editor.value) {
@@ -70,9 +120,12 @@ watch(
         const model = getRawEditor()?.getModel();
         if (model) {
           // 使用 toRaw 获取原始值，防止 Vue Proxy 导致 Monaco 卡死
-          getRawEditor()?.setValue(toRaw(newFile.content));
+          const content = toRaw(newFile.content);
+          getRawEditor()?.setValue(content);
+          lastSavedContent.value = content; // 记录当前文件的初始内容
+          lastContentHash.value = simpleHash(content); // 记录哈希值用于快速对比
+          isContentDirty.value = false; // 重置脏标志
           monaco.editor.setModelLanguage(model, toRaw(newFile.language) || 'plaintext');
-          console.debug('File content updated in editor');
         }
       }
     } else {
@@ -90,8 +143,8 @@ watch(
 
 // 组件卸载时销毁实例
 onBeforeUnmount(() => {
-  if (contentChangeDisposable.value) {
-    contentChangeDisposable.value.dispose();
+  if (debounceTimer.value) {
+    clearTimeout(debounceTimer.value); // 清理防抖定时器
   }
   if (editor.value) {
     getRawEditor()?.dispose();
@@ -107,7 +160,6 @@ async function initialize() {
   // 等待 DOM 更新，确保容器已渲染
   await nextTick();
   // 首次创建编辑器
-  console.debug('code editor instance:', getRawEditor());
   if (!editor.value && editorContainer.value) {
     console.debug('Initializing CodeEditor...');
     try {
@@ -123,6 +175,47 @@ async function initialize() {
         automaticLayout: true,
         formatOnPaste: true,
         formatOnType: true,
+      });
+      editor.value.onDidChangeModelContent(async () => {
+        if (fileStore.activeFile) {
+          const content = toRaw(editor.value)?.getValue() || '';
+          
+          // 方案1: 简单对比 - 仅当内容真的改变时才标记为脏
+          // 对于大文件，可以使用哈希值对比来提高性能
+          const currentHash = simpleHash(content);
+          if (currentHash !== lastContentHash.value) {
+            isContentDirty.value = true;
+            lastContentHash.value = currentHash;
+          }
+          
+          // 或者继续使用字符串对比（更准确）
+          // if (content !== lastSavedContent.value) {
+          //   isContentDirty.value = true;
+          // }
+          
+          // 方案2: 防抖处理 - 避免频繁更新
+          if (debounceTimer.value) {
+            clearTimeout(debounceTimer.value);
+          }
+          debounceTimer.value = setTimeout(async () => {
+            if (!isContentDirty.value) return; // 如果内容没变，不处理
+            
+            console.debug('File content changed, updating...', { 
+              contentLength: content.length,
+              isDirty: isContentDirty.value,
+              contentHash: simpleHash(content) // 可选：打印哈希值用于调试
+            });
+            
+            if (appStore.settings.editor.autoSave) {
+              await fileStore.saveFile(content);
+              lastSavedContent.value = content; // 更新最后保存的内容
+              lastContentHash.value = simpleHash(content); // 更新哈希值
+              isContentDirty.value = false;
+            } else {
+              fileStore.updateFileContent(content);
+            }
+          }, 300); // 300ms 防抖间隔
+        }
       });
 
       // 获取编辑器的配置选项
@@ -187,7 +280,7 @@ async function saveCurrentFile() {
 
   try {
     isLoading.value = true;
-    const content = editor.value?.getValue() || '';
+    const content = getRawEditor()?.getValue() || '';
     await fileStore.saveFile(content);
   } catch (error) {
     console.error('Failed to save file:', error);
@@ -216,11 +309,19 @@ function closeFile(index: number) {
   }
 
   if (file.modified) {
-    if (!confirm('文件有未保存的更改，确定要关闭吗？')) {
-      return;
-    }
+    ElMessageBox.confirm('文件有未保存的更改，确定要关闭吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }).then(() => {
+      fileStore.closeFile(file.path);
+    }).catch(() => {
+      // 用户取消
+      console.debug('用户取消');
+    });
+  } else {
+    fileStore.closeFile(file.path);
   }
-  fileStore.closeFile(file.path);
 }
 </script>
 

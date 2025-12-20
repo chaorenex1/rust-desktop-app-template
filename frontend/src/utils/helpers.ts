@@ -1,5 +1,8 @@
 import type { FileItem, ChatMessage, Workspace } from './types';
-import { normalizePath as normalizePathUtil, getFileExtension as getFileExtensionUtil } from './pathUtils';
+import {
+  normalizePath as normalizePathUtil,
+  getFileExtension as getFileExtensionUtil,
+} from './pathUtils';
 
 // File system helpers
 export function getFileExtension(filename: string): string {

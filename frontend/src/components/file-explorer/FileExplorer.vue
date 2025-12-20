@@ -202,7 +202,7 @@ async function createNew(path: string, isDirectory = false) {
       const hasExtension = name.split('.').length > 1;
       const finalName = !hasExtension ? (isDirectory ? name : `${name}.txt`) : name;
 
-      await fileStore.createFile(path,finalName, isDirectory);
+      await fileStore.createFile(path, finalName, isDirectory);
       showSuccess('创建成功');
       await refreshDirectory();
     }
@@ -224,10 +224,10 @@ async function handleContextCommand(command: string, data: FileNode) {
 
   switch (command) {
     case 'new_file':
-      await createNew(data.path,false);
+      await createNew(data.path, false);
       break;
     case 'new_folder':
-      await createNew(data.path,true);
+      await createNew(data.path, true);
       break;
     case 'rename':
       await handleRename(data);
@@ -260,7 +260,7 @@ async function handleRename(data: FileNode) {
     );
 
     if (newName && newName !== data.name) {
-      await fileStore.renameFile(data.path,data.isDirectory, newName.trim());
+      await fileStore.renameFile(data.path, data.isDirectory, newName.trim());
       showSuccess('重命名成功');
       await refreshDirectory();
     }
@@ -347,8 +347,22 @@ async function handleOpenTerminal(data: FileNode) {
     <div class="border-b border-border bg-surface p-2">
       <div class="flex items-center justify-between mb-2">
         <div class="flex items-center space-x-1">
-            <ElButton :icon="Plus" size="small" text @click="createNew(fileStore.getRootDirectory,false)"> 文件 </ElButton>
-          <ElButton :icon="Folder" size="small" text @click="createNew(fileStore.getRootDirectory,true)"> 文件夹 </ElButton>
+          <ElButton
+            :icon="Plus"
+            size="small"
+            text
+            @click="createNew(fileStore.getRootDirectory, false)"
+          >
+            文件
+          </ElButton>
+          <ElButton
+            :icon="Folder"
+            size="small"
+            text
+            @click="createNew(fileStore.getRootDirectory, true)"
+          >
+            文件夹
+          </ElButton>
         </div>
         <ElButton :icon="Refresh" size="small" text @click="refreshDirectory" />
       </div>
