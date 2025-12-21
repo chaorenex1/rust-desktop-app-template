@@ -8,7 +8,7 @@ use std::sync::{
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Emitter, Manager,
+    App, AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent,
 };
 
 #[derive(Clone, serde::Serialize)]
@@ -23,8 +23,43 @@ const TRAY_MENU_SHOW: &str = "tray_show";
 const TRAY_MENU_HIDE: &str = "tray_hide";
 const TRAY_MENU_QUIT: &str = "tray_quit";
 
+fn attach_close_to_tray(window: &WebviewWindow, is_quitting: Arc<AtomicBool>) {
+    let window_for_event = window.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::CloseRequested { api, .. } = event {
+            if !is_quitting.load(Ordering::SeqCst) {
+                api.prevent_close();
+                let _ = window_for_event.hide();
+
+                let _ = window_for_event.app_handle().emit(
+                    "app:lightweight-mode",
+                    LightweightModePayload {
+                        enabled: true,
+                        reason: "hidden".to_string(),
+                    },
+                );
+            }
+        }
+    });
+}
+
+fn get_or_create_main_window(app: &AppHandle, is_quitting: Arc<AtomicBool>) -> Option<WebviewWindow> {
+    if let Some(window) = app.get_webview_window("main") {
+        return Some(window);
+    }
+
+    let window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+        .title("Code AI Assistant")
+        .build()
+        .ok()?;
+
+    attach_close_to_tray(&window, is_quitting);
+    Some(window)
+}
+
 pub fn init_tray(app: &mut App, is_quitting: Arc<AtomicBool>) -> AppResult<()> {
     let app_handle = app.handle().clone();
+    let is_quitting_for_tray_icon = is_quitting.clone();
 
     // Build tray context menu
     let show_item = MenuItem::with_id(&app_handle, TRAY_MENU_SHOW, "显示主窗口", true, None::<&str>)?;
@@ -45,44 +80,47 @@ pub fn init_tray(app: &mut App, is_quitting: Arc<AtomicBool>) -> AppResult<()> {
         .menu(&menu)
         .on_menu_event(move |app: &AppHandle, event: tauri::menu::MenuEvent| {
             let id = event.id().as_ref();
-            if let Some(window) = app.get_webview_window("main") {
-                match id {
-                    TRAY_MENU_SHOW => {
+            match id {
+                TRAY_MENU_SHOW => {
+                    if let Some(window) = get_or_create_main_window(app, is_quitting.clone()) {
                         let _ = window.show();
                         let _ = window.set_focus();
+                    }
 
-                        let _ = app.emit(
-                            "app:lightweight-mode",
-                            LightweightModePayload {
-                                enabled: false,
-                                reason: "tray_show".to_string(),
-                            },
-                        );
-                    }
-                    TRAY_MENU_HIDE => {
-                        let _ = window.hide();
-
-                        let _ = app.emit(
-                            "app:lightweight-mode",
-                            LightweightModePayload {
-                                enabled: true,
-                                reason: "tray_hide".to_string(),
-                            },
-                        );
-                    }
-                    TRAY_MENU_QUIT => {
-                        // Mark quitting so CloseRequested handler allows the window to close.
-                        is_quitting.store(true, Ordering::SeqCst);
-                        let _ = window.close();
-                    }
-                    _ => {}
+                    let _ = app.emit(
+                        "app:lightweight-mode",
+                        LightweightModePayload {
+                            enabled: false,
+                            reason: "tray_show".to_string(),
+                        },
+                    );
                 }
-            } else if id == TRAY_MENU_QUIT {
-                is_quitting.store(true, Ordering::SeqCst);
-                app.exit(0);
+                TRAY_MENU_HIDE => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.hide();
+                    }
+
+                    let _ = app.emit(
+                        "app:lightweight-mode",
+                        LightweightModePayload {
+                            enabled: true,
+                            reason: "tray_hide".to_string(),
+                        },
+                    );
+                }
+                TRAY_MENU_QUIT => {
+                    // Mark quitting so CloseRequested handler allows the window to close.
+                    is_quitting.store(true, Ordering::SeqCst);
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.close();
+                    } else {
+                        app.exit(0);
+                    }
+                }
+                _ => {}
             }
         })
-        .on_tray_icon_event(|tray: &TrayIcon, event: TrayIconEvent| {
+        .on_tray_icon_event(move |tray: &TrayIcon, event: TrayIconEvent| {
             // Double-click to toggle main window
             if let TrayIconEvent::DoubleClick { .. } = event {
                 let app = tray.app_handle();
@@ -109,6 +147,22 @@ pub fn init_tray(app: &mut App, is_quitting: Arc<AtomicBool>) -> AppResult<()> {
                             },
                         );
                     }
+                } else {
+                    // No window: rebuild it then show
+                    if let Some(window) =
+                        get_or_create_main_window(app, is_quitting_for_tray_icon.clone())
+                    {
+                        let _ = window.show();
+                        let _ = window.set_focus();
+                    }
+
+                    let _ = app.emit(
+                        "app:lightweight-mode",
+                        LightweightModePayload {
+                            enabled: false,
+                            reason: "tray_double_click_rebuild".to_string(),
+                        },
+                    );
                 }
             }
         })
