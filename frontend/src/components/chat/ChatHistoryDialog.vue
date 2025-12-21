@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
-import { ElDialog, ElInput, ElButton, ElIcon, ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
+import { ElDialog, ElInput, ElButton, ElIcon, ElMessageBox, ElEmpty } from 'element-plus';
 import { Search, Delete, Edit, Loading, Clock } from '@element-plus/icons-vue';
 
 import { loadChatSessions, deleteChatSession, updateChatSessionName } from '@/services/tauri/commands';

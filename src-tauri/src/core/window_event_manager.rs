@@ -7,7 +7,13 @@ use std::sync::{
     Arc,
 };
 
-use tauri::{App, Manager, WindowEvent};
+use tauri::{App, Emitter, Manager, WindowEvent};
+
+#[derive(Clone, serde::Serialize)]
+struct LightweightModePayload {
+    enabled: bool,
+    reason: String,
+}
 
 use crate::utils::error::AppResult;
 
@@ -35,6 +41,15 @@ impl WindowEventManager {
                     if !is_quitting_for_event.load(Ordering::SeqCst) {
                         api.prevent_close();
                         let _ = window_for_event.hide();
+
+                        // When the window is hidden to tray, enter lightweight mode.
+                        let _ = window_for_event.app_handle().emit(
+                            "app:lightweight-mode",
+                            LightweightModePayload {
+                                enabled: true,
+                                reason: "hidden".to_string(),
+                            },
+                        );
                     }
                 }
             });

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue';
 import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElMessageBox } from 'element-plus';
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 
 import { getLogs } from '@/services/tauri/commands';
+import { useAppStore } from '@/stores';
+
+const appStore = useAppStore();
 
 const logs = ref<string[]>([]);
 
@@ -41,7 +44,18 @@ function stopAutoRefresh() {
 
 onMounted(() => {
   loadLogs();
-  startAutoRefresh();
+
+  watch(
+    () => appStore.isLightweightMode,
+    (enabled) => {
+      if (enabled) {
+        stopAutoRefresh();
+      } else {
+        startAutoRefresh();
+      }
+    },
+    { immediate: true }
+  );
 });
 
 onUnmounted(() => {

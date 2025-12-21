@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useAppStore, useThemeStore } from '@/stores';
 import { ErrorContainer } from '@/components/error';
 import { setToastContainer, showSuccess, showError } from '@/utils/toast';
+import { initLightweightModeMonitor } from '@/services/tauri/lightweightMode';
 
 const appStore = useAppStore();
 const themeStore = useThemeStore();
 const isLoading = ref(true);
 const toastContainerRef = ref<InstanceType<typeof ErrorContainer> | null>(null);
+let disposeLightweightMode: null | (() => void) = null;
 
 onMounted(async () => {
   // 初始化 toast 容器
@@ -21,6 +23,9 @@ onMounted(async () => {
     // Theme
     themeStore.initialize(appStore.settings.theme, appStore.settings.colorScheme);
 
+    // Lightweight mode (minimized/hidden throttling)
+    disposeLightweightMode = await initLightweightModeMonitor(appStore);
+
     // Listen to Tauri events
     // await setupEventListeners();
 
@@ -32,6 +37,11 @@ onMounted(async () => {
     // Always show the layout even if initialization fails
     isLoading.value = false;
   }
+});
+
+onUnmounted(() => {
+  disposeLightweightMode?.();
+  disposeLightweightMode = null;
 });
 
 // async function setupEventListeners() {

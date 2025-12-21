@@ -74,7 +74,7 @@ export const useAppStore = defineStore('app', () => {
       currentCodeCli: 'claude-cli',
       currentShell: 'bash',
     },
-    
+
   } as AppSettings);
   const settings = ref<AppSettings>(defaultSettings.value);
   const workspaces = ref<Workspace[]>([]);
@@ -94,6 +94,10 @@ export const useAppStore = defineStore('app', () => {
   const isConnected = ref(false);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+
+  // Lightweight mode (enabled when minimized/hidden)
+  const isLightweightMode = ref(false);
+  const lightweightModeReason = ref<string | null>(null);
 
   // Getters
   const themeClass = computed(() => settings.value.theme);
@@ -260,6 +264,15 @@ export const useAppStore = defineStore('app', () => {
     await saveSettings();
   }
 
+  function setLightweightMode(enabled: boolean, reason?: string) {
+    if (isLightweightMode.value === enabled && (reason ?? null) === lightweightModeReason.value) {
+      return;
+    }
+
+    isLightweightMode.value = enabled;
+    lightweightModeReason.value = reason ?? null;
+  }
+
   const saveToStorage = () => {
     localStorage.setItem('appSettings', JSON.stringify(settings.value));
     localStorage.setItem('currentWorkspace', JSON.stringify(currentWorkspace.value));
@@ -305,6 +318,8 @@ export const useAppStore = defineStore('app', () => {
     isConnected,
     isLoading,
     error,
+    isLightweightMode,
+    lightweightModeReason,
     settings,
     workspaces,
 
@@ -325,5 +340,6 @@ export const useAppStore = defineStore('app', () => {
     setCurrentCodeCli,
     setCurrentShell,
     resetToDefaults,
+    setLightweightMode,
   };
 });

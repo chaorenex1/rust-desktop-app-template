@@ -8,8 +8,14 @@ use std::sync::{
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{TrayIcon, TrayIconBuilder, TrayIconEvent},
-    App, AppHandle, Manager,
+    App, AppHandle, Emitter, Manager,
 };
+
+#[derive(Clone, serde::Serialize)]
+struct LightweightModePayload {
+    enabled: bool,
+    reason: String,
+}
 
 use crate::utils::error::{generic_error, AppResult};
 
@@ -44,9 +50,25 @@ pub fn init_tray(app: &mut App, is_quitting: Arc<AtomicBool>) -> AppResult<()> {
                     TRAY_MENU_SHOW => {
                         let _ = window.show();
                         let _ = window.set_focus();
+
+                        let _ = app.emit(
+                            "app:lightweight-mode",
+                            LightweightModePayload {
+                                enabled: false,
+                                reason: "tray_show".to_string(),
+                            },
+                        );
                     }
                     TRAY_MENU_HIDE => {
                         let _ = window.hide();
+
+                        let _ = app.emit(
+                            "app:lightweight-mode",
+                            LightweightModePayload {
+                                enabled: true,
+                                reason: "tray_hide".to_string(),
+                            },
+                        );
                     }
                     TRAY_MENU_QUIT => {
                         // Mark quitting so CloseRequested handler allows the window to close.
@@ -67,9 +89,25 @@ pub fn init_tray(app: &mut App, is_quitting: Arc<AtomicBool>) -> AppResult<()> {
                 if let Some(window) = app.get_webview_window("main") {
                     if window.is_visible().unwrap_or(true) {
                         let _ = window.hide();
+
+                        let _ = app.emit(
+                            "app:lightweight-mode",
+                            LightweightModePayload {
+                                enabled: true,
+                                reason: "tray_double_click_hide".to_string(),
+                            },
+                        );
                     } else {
                         let _ = window.show();
                         let _ = window.set_focus();
+
+                        let _ = app.emit(
+                            "app:lightweight-mode",
+                            LightweightModePayload {
+                                enabled: false,
+                                reason: "tray_double_click_show".to_string(),
+                            },
+                        );
                     }
                 }
             }
