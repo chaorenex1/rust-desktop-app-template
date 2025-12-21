@@ -33,7 +33,6 @@ let aiUnlisten: (() => void) | null = null;
 // 历史记录相关
 const showHistoryDialog = ref(false);
 const currentSessionId = ref<string | null>(null);
-const currentCodeagentSessionId = ref<string | null>(null);
 
 // 关联文件弹窗
 const showAssociateDialog = ref(false);
@@ -108,8 +107,9 @@ async function setupAiResponseListener() {
           isLoading.value = false;
           currentRequestId.value = null;
 
+          // 统一会话 id：优先使用 codeagent-wrapper 的 session id
           if (data.codeagent_session_id) {
-            currentCodeagentSessionId.value = data.codeagent_session_id;
+            currentSessionId.value = data.codeagent_session_id;
           }
 
           // AI 完成后保存（包含最新的 codeagent session id）
@@ -146,10 +146,10 @@ async function autoSaveChatSession() {
       currentSessionId.value,
       null, // 不自动生成名称，由用户手动命名
       messages.value,
-      currentCodeagentSessionId.value
+      currentSessionId.value
     );
     currentSessionId.value = session.id;
-    currentCodeagentSessionId.value = session.codeagentSessionId || currentCodeagentSessionId.value;
+    // 统一后 session.id 就是 resume id
     console.log('Chat session auto-saved:', session.id);
   } catch (error) {
     console.error('Failed to auto-save chat session:', error);
@@ -184,7 +184,7 @@ async function sendMessage() {
       content,
       contextFiles,
       appStore.currentCodeCli,
-      currentCodeagentSessionId.value || undefined,
+      currentSessionId.value || undefined,
       appStore.currentAiModel
     );
     currentRequestId.value = requestId;
@@ -214,7 +214,6 @@ async function sendMessage() {
 function loadHistorySession(session: ChatSession) {
   messages.value = session.messages;
   currentSessionId.value = session.id;
-  currentCodeagentSessionId.value = session.codeagentSessionId || null;
   associatedFiles.value = []; // 清空关联文件（历史会话中已包含文件信息）
 }
 
@@ -228,7 +227,6 @@ function clearChat() {
     .then(() => {
       messages.value = [];
       currentSessionId.value = null; // 清空当前会话ID
-      currentCodeagentSessionId.value = null;
     })
     .catch(() => {
       // 用户取消
@@ -543,6 +541,7 @@ function confirmAssociate() {
   <!-- 聊天历史对话框 -->
   <ChatHistoryDialog
     v-model="showHistoryDialog"
+    @load-session="loadHistorySession"
   />
 </template>
 

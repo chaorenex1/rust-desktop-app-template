@@ -81,8 +81,20 @@ pub fn save_session(
 ) -> Result<ChatSession, String> {
     let dir = ensure_sessions_dir_exists()?;
 
-    // Generate new ID or use existing
-    let id = session_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let session_id = session_id.and_then(|s| {
+        let t = s.trim().to_string();
+        if t.is_empty() { None } else { Some(t) }
+    });
+    let codeagent_session_id = codeagent_session_id.and_then(|s| {
+        let t = s.trim().to_string();
+        if t.is_empty() { None } else { Some(t) }
+    });
+
+    // 统一 id：优先使用 codeagent_session_id（用于 resume），否则沿用已有 id，再否则生成。
+    let id = codeagent_session_id
+        .clone()
+        .or(session_id.clone())
+        .unwrap_or_else(|| Uuid::new_v4().to_string());
     let file_path = dir.join(format!("{}.json", id));
 
     info!("Saving chat session: {} (file: {:?})", id, file_path);
@@ -121,7 +133,8 @@ pub fn save_session(
     let session = ChatSession {
         id: id.clone(),
         name,
-        codeagent_session_id: codeagent_session_id.or(preserved_codeagent_session_id),
+        // 兼容字段：保持与 id 一致，避免“双 id”
+        codeagent_session_id: Some(id.clone()).or(preserved_codeagent_session_id),
         messages,
         created_at,
         updated_at: now,
@@ -175,18 +188,39 @@ pub fn load_all_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>, Strin
         }
 
         match fs::read_to_string(&path) {
-            Ok(content) => {
-                match serde_json::from_str::<ChatSession>(&content) {
-                    Ok(session) => {
-                        debug!("Loaded session: {} from {:?}", session.id, path);
-                        sessions.push(session);
+            Ok(content) => match serde_json::from_str::<ChatSession>(&content) {
+                Ok(mut session) => {
+                    // 自动迁移：如果历史里存在 codeagent_session_id 且与 id 不同，尝试将文件重命名为 codeagent_session_id。
+                    if let Some(new_id) = session.codeagent_session_id.clone() {
+                        let new_id = new_id.trim().to_string();
+                        if !new_id.is_empty() && new_id != session.id {
+                            let new_path = dir.join(format!("{}.json", new_id));
+                            if !new_path.exists() {
+                                match fs::rename(&path, &new_path) {
+                                    Ok(()) => {
+                                        session.id = new_id.clone();
+                                        session.codeagent_session_id = Some(new_id);
+                                        if let Ok(json) = serde_json::to_string_pretty(&session) {
+                                            let _ = fs::write(&new_path, json);
+                                        }
+                                        debug!("Migrated session file {:?} -> {:?}", path, new_path);
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to migrate session file {:?} -> {:?}: {}", path, new_path, e);
+                                    }
+                                }
+                            }
+                        }
                     }
-                    Err(e) => {
-                        error!("Failed to parse session file {:?}: {}", path, e);
-                        error_count += 1;
-                    }
+
+                    debug!("Loaded session: {} from {:?}", session.id, path);
+                    sessions.push(session);
                 }
-            }
+                Err(e) => {
+                    error!("Failed to parse session file {:?}: {}", path, e);
+                    error_count += 1;
+                }
+            },
             Err(e) => {
                 error!("Failed to read session file {:?}: {}", path, e);
                 error_count += 1;

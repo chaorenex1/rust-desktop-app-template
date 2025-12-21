@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
-use tracing::info;
+use tracing::{debug, info, warn};
 
 use crate::utils::error::{AppError, AppResult};
 
@@ -430,6 +430,33 @@ impl AiService {
             }
         }
 
+        info!(
+            codeagent_bin = %bin.display(),
+            workdir = %spec.workdir,
+            backend = %spec.backend,
+            parallel = spec.parallel,
+            skip_permissions = spec.skip_permissions,
+            timeout_ms = ?spec.timeout_ms,
+            max_parallel_workers = ?spec.max_parallel_workers,
+            resume_session_id = ?spec.resume_session_id,
+            "Executing codeagent-wrapper"
+        );
+        debug!(args = ?args, "codeagent-wrapper args");
+        if let Some(timeout_ms) = spec.timeout_ms {
+            debug!(CODEX_TIMEOUT = timeout_ms, "codeagent-wrapper env");
+        }
+        if spec.skip_permissions {
+            debug!(CODEAGENT_SKIP_PERMISSIONS = "1", "codeagent-wrapper env");
+        }
+        if let Some(max_workers) = spec.max_parallel_workers {
+            debug!(CODEAGENT_MAX_PARALLEL_WORKERS = max_workers, "codeagent-wrapper env");
+        }
+        if spec.backend.trim().eq_ignore_ascii_case("codex") {
+            if let Some(m) = spec.codex_model.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+                debug!(CODEX_MODEL = %m, "codeagent-wrapper env");
+            }
+        }
+
         let mut child = cmd.spawn().map_err(|e| {
             AppError::AiServiceError(format!(
                 "启动 codeagent-wrapper 失败: {} (bin={})",
@@ -454,7 +481,22 @@ impl AiService {
         let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
         let exit_code = output.status.code().unwrap_or(-1);
 
+        debug!(
+            exit_code,
+            stdout_len = stdout.len(),
+            stderr_len = stderr.len(),
+            "codeagent-wrapper finished"
+        );
+
         if exit_code != 0 {
+            let stderr_tail = tail_snippet(&stderr, 4000);
+            let stdout_tail = tail_snippet(&stdout, 4000);
+            warn!(
+                exit_code,
+                stderr_tail = %stderr_tail,
+                stdout_tail = %stdout_tail,
+                "codeagent-wrapper failed"
+            );
             return Err(AppError::AiServiceError(format!(
                 "codeagent-wrapper 退出码 {}。stderr: {}",
                 exit_code,
@@ -463,6 +505,12 @@ impl AiService {
         }
 
         let (message, session_id) = parse_codeagent_stdout(&stdout);
+        debug!(
+            parsed_session_id = ?session_id,
+            message_len = message.len(),
+            stdout_tail = %tail_snippet(&stdout, 1000),
+            "parsed codeagent-wrapper stdout"
+        );
         if message.trim().is_empty() {
             return Err(AppError::AiServiceError(format!(
                 "codeagent-wrapper 未返回有效消息。stderr: {}",
@@ -513,19 +561,78 @@ fn parse_codeagent_stdout(stdout: &str) -> (String, Option<String>) {
     // <message>\n
     // ---\n
     // SESSION_ID: <id>\n
+    // On Windows, output may contain CRLF; normalize to LF for parsing.
+    let normalized = stdout.replace("\r\n", "\n");
+
+    // Preferred exact marker
     let marker = "\n---\nSESSION_ID:";
-    if let Some(idx) = stdout.rfind(marker) {
-        let message = stdout[..idx].trim().to_string();
-        let tail = &stdout[idx + marker.len()..];
+    if let Some(idx) = normalized.rfind(marker) {
+        let message = normalized[..idx].trim().to_string();
+        let tail = &normalized[idx + marker.len()..];
         let session_id = tail
             .lines()
             .next()
-            .map(|s| s.trim().trim_matches(':').trim())
+            .map(|s| s.trim().trim_start_matches(':').trim())
             .filter(|s| !s.is_empty())
             .map(|s| s.to_string());
         return (message, session_id);
     }
-    (stdout.trim().to_string(), None)
+
+    // Fallback: some versions may omit the leading newline before ---
+    let marker2 = "---\nSESSION_ID:";
+    if let Some(idx) = normalized.rfind(marker2) {
+        let message = normalized[..idx].trim().to_string();
+        let tail = &normalized[idx + marker2.len()..];
+        let session_id = tail
+            .lines()
+            .next()
+            .map(|s| s.trim().trim_start_matches(':').trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        return (message, session_id);
+    }
+
+    // Fallback: at least try to parse SESSION_ID even if delimiter formatting changes.
+    if let Some(idx) = normalized.rfind("SESSION_ID:") {
+        let before = &normalized[..idx];
+        let after = &normalized[idx + "SESSION_ID:".len()..];
+        let session_id = after
+            .lines()
+            .next()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_string());
+        let message = before
+            .trim_end_matches('-')
+            .trim()
+            .to_string();
+        return (message, session_id);
+    }
+
+    (normalized.trim().to_string(), None)
+}
+
+fn tail_snippet(s: &str, max_chars: usize) -> String {
+    if max_chars == 0 {
+        return String::new();
+    }
+    let normalized = s.replace("\r\n", "\n");
+    let mut out = if normalized.chars().count() <= max_chars {
+        normalized
+    } else {
+        let start = normalized
+            .char_indices()
+            .rev()
+            .nth(max_chars)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
+        format!("…{}", &normalized[start..])
+    };
+    // Avoid huge single-line log entries.
+    if out.len() > max_chars + 2 {
+        out.truncate(max_chars + 2);
+    }
+    out
 }
 
 impl Default for AiService {
