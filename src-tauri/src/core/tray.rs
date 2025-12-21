@@ -24,14 +24,23 @@ const TRAY_MENU_HIDE: &str = "tray_hide";
 const TRAY_MENU_QUIT: &str = "tray_quit";
 
 fn attach_close_to_tray(window: &WebviewWindow, is_quitting: Arc<AtomicBool>) {
-    let window_for_event = window.clone();
+    // To avoid a reference cycle, capture only the AppHandle and window label
+    // instead of cloning the window. This way, the window doesn't hold a
+    // reference to itself through the event handler closure.
+    let app_handle = window.app_handle().clone();
+    let window_label = window.label().to_string();
+    
     window.on_window_event(move |event| {
         if let WindowEvent::CloseRequested { api, .. } = event {
             if !is_quitting.load(Ordering::SeqCst) {
                 api.prevent_close();
-                let _ = window_for_event.hide();
+                
+                // Retrieve the window from AppHandle when needed
+                if let Some(window) = app_handle.get_webview_window(&window_label) {
+                    let _ = window.hide();
+                }
 
-                let _ = window_for_event.app_handle().emit(
+                let _ = app_handle.emit(
                     "app:lightweight-mode",
                     LightweightModePayload {
                         enabled: true,
