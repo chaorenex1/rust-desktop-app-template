@@ -527,7 +527,6 @@ function confirmAssociate() {
   <!-- 聊天历史对话框 -->
   <ChatHistoryDialog
     v-model="showHistoryDialog"
-    @load-session="loadHistorySession"
   />
 </template>
 
