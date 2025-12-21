@@ -78,6 +78,7 @@ interface AiResponseEventPayload {
   request_id: string;
   delta: string;
   done: boolean;
+  codeagent_session_id?: string | null;
 }
 
 async function setupAiResponseListener() {
@@ -105,6 +106,14 @@ async function setupAiResponseListener() {
         if (data.done) {
           isLoading.value = false;
           currentRequestId.value = null;
+
+          // 统一会话 id：优先使用 codeagent-wrapper 的 session id
+          if (data.codeagent_session_id) {
+            currentSessionId.value = data.codeagent_session_id;
+          }
+
+          // AI 完成后保存（包含最新的 codeagent session id）
+          void autoSaveChatSession();
         }
       } catch (err) {
         console.error('Failed to handle ai-response event:', err);
@@ -136,9 +145,11 @@ async function autoSaveChatSession() {
     const session = await saveChatSession(
       currentSessionId.value,
       null, // 不自动生成名称，由用户手动命名
-      messages.value
+      messages.value,
+      currentSessionId.value
     );
     currentSessionId.value = session.id;
+    // 统一后 session.id 就是 resume id
     console.log('Chat session auto-saved:', session.id);
   } catch (error) {
     console.error('Failed to auto-save chat session:', error);
@@ -169,7 +180,13 @@ async function sendMessage() {
   try {
     isLoading.value = true;
     // 调用后端流式 AI 命令，返回本次会话的 requestId
-    const requestId = await sendChatMessageStreaming(content, contextFiles);
+    const requestId = await sendChatMessageStreaming(
+      content,
+      contextFiles,
+      appStore.currentCodeCli,
+      currentSessionId.value || undefined,
+      appStore.currentAiModel
+    );
     currentRequestId.value = requestId;
 
     // 先插入一个空内容的 assistant 气泡，后续通过事件流式填充
@@ -185,10 +202,7 @@ async function sendMessage() {
     // Clear message
     message.value = '';
 
-    // 自动保存会话（延迟一点，等AI响应完成）
-    setTimeout(() => {
-      autoSaveChatSession();
-    }, 1000);
+    // 自动保存由 ai-response done 触发
   } catch (error) {
     console.error('Failed to send message:', error);
   } finally {

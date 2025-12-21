@@ -3,16 +3,13 @@
 //! This module defines Tauri IPC commands that can be called from the frontend.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::time::Duration;
-use serde::{Deserialize, Serialize};
-use tauri::{State, AppHandle};
-use tracing::{error, info, debug};
+use tauri::{AppHandle, State};
+use tracing::{error, info};
 use tauri::async_runtime;
-use tracing_subscriber::field::debug;
-
-use crate::config::AppConfig;
 use crate::core::AppState;
+use crate::services::ai::{AiChatOptions, AiService};
 use super::event_handlers::emit_ai_response;
 
 /// Send chat message to AI
@@ -23,53 +20,11 @@ pub async fn send_chat_message(
 ) -> Result<String, String> {
     info!("Sending chat message: {}", message);
 
-    // NOTE: 这里仍然是占位实现，只是演示如何携带关联文件信息
-    let snippet_limit: usize = 200;
-    let mut file_summaries = Vec::new();
-
-    if let Some(files) = &context_files {
-        for path in files.iter().take(8) {
-            // 为了避免阻塞，这里只尝试快速读取一小段内容，不影响主线程
-            let path_clone = path.clone();
-            let result = async_runtime::spawn_blocking(move || fs::read_to_string(&path_clone)).await;
-
-            match result {
-                Ok(Ok(content)) => {
-                    let preview: String = if content.len() > snippet_limit {
-                        format!("{}...", &content[..snippet_limit])
-                    } else {
-                        content
-                    };
-                    file_summaries.push(format!("- {}\n{}", path, preview));
-                }
-                Ok(Err(e)) => {
-                    error!("Failed to read context file {}: {:?}", path, e);
-                    file_summaries.push(format!("- {} (读取失败: {})", path, e));
-                }
-                Err(e) => {
-                    error!("Failed to join blocking task for context file {}: {:?}", path, e);
-                    file_summaries.push(format!("- {} (读取任务失败)", path));
-                }
-            }
-        }
-    }
-
-    let base = format!(
-        "AI Response: Received your message about '{}'.",
-        if message.len() > 50 { &message[..50] } else { &message }
-    );
-
-    let response = if file_summaries.is_empty() {
-        base
-    } else {
-        format!(
-            "{}\n\nAssociated files (preview):\n{}",
-            base,
-            file_summaries.join("\n\n")
-        )
-    };
-
-    Ok(response)
+    // Use AiService as the single entry; internally it calls codeagent-wrapper.
+    let ai = AiService::new();
+    ai.send_message(&message, context_files)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Send chat message to AI with simulated streaming response
@@ -78,8 +33,17 @@ pub async fn send_chat_message_streaming(
     app_handle: AppHandle,
     message: String,
     context_files: Option<Vec<String>>,
+    code_cli: Option<String>,
+    resume_session_id: Option<String>,
+    codex_model: Option<String>,
 ) -> Result<String, String> {
     info!("Sending chat message (streaming): {}", message);
+    info!(
+        code_cli = ?code_cli,
+        resume_session_id = ?resume_session_id,
+        codex_model = ?codex_model,
+        "Streaming chat options"
+    );
 
     // 为本次会话生成唯一 request_id，前端用它关联流式回复
     let request_id = uuid::Uuid::new_v4().to_string();
@@ -91,10 +55,22 @@ pub async fn send_chat_message_streaming(
     let ctx_files = context_files.clone();
 
     async_runtime::spawn(async move {
-        // 复用现有的 send_chat_message 逻辑构造完整回复
-        match send_chat_message(msg, ctx_files).await {
-            Ok(full_response) => {
-                let chars: Vec<char> = full_response.chars().collect();
+        let ai = AiService::new();
+        match ai
+            .send_message_with_options(
+                &msg,
+                ctx_files,
+                AiChatOptions {
+                    code_cli,
+                    resume_session_id,
+                    parallel: false,
+                    codex_model,
+                },
+            )
+            .await
+        {
+            Ok(result) => {
+                let chars: Vec<char> = result.message.chars().collect();
                 let total = chars.len();
                 let mut buffer = String::new();
 
@@ -107,11 +83,18 @@ pub async fn send_chat_message_streaming(
                         let delta = buffer.clone();
                         buffer.clear();
 
+                        let codeagent_session_id = if is_last {
+                            result.codeagent_session_id.as_deref()
+                        } else {
+                            None
+                        };
+
                         if let Err(e) = emit_ai_response(
                             &app_handle_clone,
                             &request_id_for_task,
                             &delta,
                             is_last,
+                            codeagent_session_id,
                         ) {
                             error!("Failed to emit AI response chunk: {:?}", e);
                             break;
@@ -129,6 +112,7 @@ pub async fn send_chat_message_streaming(
                     &request_id_for_task,
                     &format!("[AI 错误] {}", e),
                     true,
+                    None,
                 );
             }
         }

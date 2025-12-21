@@ -33,17 +33,25 @@ impl WindowEventManager {
     /// - When `is_quitting` is set (e.g. tray "退出"), closing is allowed.
     pub fn register_main_window(&self, app: &App) -> AppResult<()> {
         if let Some(window) = app.get_webview_window("main") {
-            let window_for_event = window.clone();
+            // To avoid a reference cycle, capture only the AppHandle and window label
+            // instead of cloning the window. This way, the window doesn't hold a
+            // reference to itself through the event handler closure.
+            let app_handle = window.app_handle().clone();
+            let window_label = window.label().to_string();
             let is_quitting_for_event = self.is_quitting.clone();
 
             window.on_window_event(move |event| {
                 if let WindowEvent::CloseRequested { api, .. } = event {
                     if !is_quitting_for_event.load(Ordering::SeqCst) {
                         api.prevent_close();
-                        let _ = window_for_event.hide();
+                        
+                        // Retrieve the window from AppHandle when needed
+                        if let Some(window) = app_handle.get_webview_window(&window_label) {
+                            let _ = window.hide();
+                        }
 
                         // When the window is hidden to tray, enter lightweight mode.
-                        let _ = window_for_event.app_handle().emit(
+                        let _ = app_handle.emit(
                             "app:lightweight-mode",
                             LightweightModePayload {
                                 enabled: true,

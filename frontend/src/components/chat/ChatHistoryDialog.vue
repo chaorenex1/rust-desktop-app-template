@@ -22,6 +22,7 @@ type RawChatSession = ChatSession &
     updated_at: string;
     message_count: number;
     first_message_preview: string;
+    codeagent_session_id: string;
   }>;
 
 const TIMESTAMP_FRACTION_REGEX = /\.(\d{3})\d+/;
@@ -51,6 +52,7 @@ function normalizeSession(session: RawChatSession): ChatSession {
     ...session,
     createdAt: session.createdAt || session.created_at || '',
     updatedAt: session.updatedAt || session.updated_at || '',
+    codeagentSessionId: session.codeagentSessionId || session.codeagent_session_id || undefined,
     messageCount:
       session.messageCount ??
       session.message_count ??
