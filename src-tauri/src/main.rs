@@ -10,6 +10,10 @@
 
 use tauri::Manager;
 use tracing::info;
+use std::sync::{
+    Arc,
+    atomic::AtomicBool,
+};
 
 mod config;
 mod core;
@@ -80,6 +84,7 @@ fn main() {
             tauri_module::chat_session_commands::load_chat_sessions,
             tauri_module::chat_session_commands::delete_chat_session,
             tauri_module::chat_session_commands::update_chat_session_name,
+            tauri_module::notification_commands::show_system_notification,
         ])
 
         // Setup application state
@@ -92,6 +97,18 @@ fn main() {
             
             // Initialize database connection
             database::connection::init(app)?;
+
+            // Initialize system notification manager
+            core::notification_manager::init(app)?;
+
+            let is_quitting = Arc::new(AtomicBool::new(false));
+
+            // Initialize system tray
+            core::tray::init_tray(app, is_quitting.clone())?;
+
+            // Register window events in a single place
+            core::window_event_manager::WindowEventManager::new(is_quitting)
+                .register(app)?;
 
             // Register event handlers
             tauri_module::event_handlers::register_event_handlers(app)?;
