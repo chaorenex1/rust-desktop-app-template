@@ -16,21 +16,6 @@ import {
 
 export const useAppStore = defineStore('app', () => {
   // State
-  const currentShell = ref('');
-  const currentAiModel = ref('');
-  const currentCodeCli = ref('');
-  const currentWorkspace = ref<Workspace>({
-    id: '',
-    name: '',
-    path: '',
-    isActive: false,
-    createdAt: '',
-    updatedAt: '',
-    settings: {},
-  });
-  const isConnected = ref(false);
-  const isLoading = ref(false);
-  const error = ref<string | null>(null);
   const defaultSettings = ref<AppSettings>({
     theme: 'light',
     colorScheme: 'light',
@@ -84,9 +69,31 @@ export const useAppStore = defineStore('app', () => {
       { name: 'API_KEY', value: '', isSecret: true },
       { name: 'PATH', value: '/usr/bin', isSecret: false },
     ],
+    userPreferences: {
+      currentModel: 'claude-3-5-sonnet',
+      currentCodeCli: 'claude-cli',
+      currentShell: 'bash',
+    },
+    
   } as AppSettings);
   const settings = ref<AppSettings>(defaultSettings.value);
   const workspaces = ref<Workspace[]>([]);
+
+  const currentShell = ref<string>(settings.value.userPreferences.currentShell || '');
+  const currentAiModel = ref<string>(settings.value.userPreferences.currentModel || '');
+  const currentCodeCli = ref<string>(settings.value.userPreferences.currentCodeCli || '');
+  const currentWorkspace = ref<Workspace>({
+    id: '',
+    name: '',
+    path: '',
+    isActive: false,
+    createdAt: '',
+    updatedAt: '',
+    settings: {},
+  });
+  const isConnected = ref(false);
+  const isLoading = ref(false);
+  const error = ref<string | null>(null);
 
   // Getters
   const themeClass = computed(() => settings.value.theme);
@@ -112,7 +119,9 @@ export const useAppStore = defineStore('app', () => {
           await saveSettings()
           console.warn('No settings received from backend, using defaults.');
         }
-        currentAiModel.value = settings.value.ai.defaultModel;
+        currentAiModel.value = settings.value.userPreferences.currentModel || '';
+        currentCodeCli.value = settings.value.userPreferences.currentCodeCli || '';
+        currentShell.value = settings.value.userPreferences.currentShell || '';
       } catch (err) {
         console.warn('Failed to load settings from backend, using defaults:', err);
       }
@@ -229,16 +238,19 @@ export const useAppStore = defineStore('app', () => {
 
   function setCurrentAiModel(model: string) {
     currentAiModel.value = model;
+    settings.value.userPreferences.currentModel = model;
     saveToStorage();
   }
 
   function setCurrentCodeCli(cli: string) {
     currentCodeCli.value = cli;
+    settings.value.userPreferences.currentCodeCli = cli;
     saveToStorage();
   }
 
   function setCurrentShell(shell: string) {
     currentShell.value = shell;
+    settings.value.userPreferences.currentShell = shell;
     saveToStorage();
   }
 

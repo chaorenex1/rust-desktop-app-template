@@ -9,9 +9,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  'resize-reset': [width: number];
+  'resize-start': [event: MouseEvent];
   'updateWidth': [width: number];
-  
+  'resize-reset': [width: number];
 }>();
 
 // 拉伸功能相关
@@ -24,6 +24,8 @@ function handleResizeStart(event: MouseEvent) {
   isResizing.value = true;
   resizeStartX = event.clientX;
   resizeStartWidth = sidebarWidth.value;
+
+  emit('resize-start', event);
 
   document.addEventListener('mousemove', handleResizing);
   document.addEventListener('mouseup', handleResizeEnd);

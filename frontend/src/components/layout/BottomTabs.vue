@@ -91,7 +91,7 @@ function onSelectTab(key: string) {
         </div>
 
         <div class="flex items-center space-x-4">
-          <span>AI模型:</span>
+          <span>AI模型:{{ appStore.currentAiModel }}</span>
           <span>|</span>
           <span>状态: {{ appStore.isConnected ? '已连接' : '未连接' }}</span>
         </div>

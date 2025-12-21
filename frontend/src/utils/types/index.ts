@@ -22,6 +22,7 @@ export interface AppSettings {
   models: AIModel[];
   codeCli: CodeCli[];
   environmentVariables: EnvironmentVariable[];
+  userPreferences: UserPreference;
 }
 
 export interface EnvironmentVariable {
@@ -128,6 +129,12 @@ export interface UserPreferences {
     findInFiles: string;
     formatDocument: string;
   };
+}
+
+export interface UserPreference {
+  currentModel: string;
+  currentCodeCli: string;
+  currentShell: string;
 }
 
 export type AuthState = 'idle' | 'loading' | 'authenticated' | 'error';
