@@ -208,6 +208,7 @@ export interface ChatResponse {
 export interface ChatSession {
   id: string;
   name?: string;
+  codeagentSessionId?: string;
   messages: ChatMessage[];
   createdAt: string;
   updatedAt: string;

@@ -3,7 +3,7 @@
 //! This module provides functions for managing chat sessions stored as JSON files.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 use chrono::Utc;
 use uuid::Uuid;
@@ -25,6 +25,8 @@ pub struct ChatMessage {
 pub struct ChatSession {
     pub id: String,
     pub name: Option<String>,
+    #[serde(default)]
+    pub codeagent_session_id: Option<String>,
     pub messages: Vec<ChatMessage>,
     pub created_at: String,
     pub updated_at: String,
@@ -74,6 +76,7 @@ fn load_session_by_id(session_id: &str) -> Result<ChatSession, String> {
 pub fn save_session(
     session_id: Option<String>,
     name: Option<String>,
+    codeagent_session_id: Option<String>,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatSession, String> {
     let dir = ensure_sessions_dir_exists()?;
@@ -101,16 +104,16 @@ pub fn save_session(
         .unwrap_or_default();
 
     // Preserve created_at if updating existing session
-    let created_at = if file_path.exists() {
+    let (created_at, preserved_codeagent_session_id) = if file_path.exists() {
         match load_session_by_id(&id) {
-            Ok(existing) => existing.created_at,
+            Ok(existing) => (existing.created_at, existing.codeagent_session_id),
             Err(_) => {
                 warn!("Failed to load existing session, using current time as created_at");
-                now.clone()
+                (now.clone(), None)
             }
         }
     } else {
-        now.clone()
+        (now.clone(), None)
     };
 
     let message_count = messages.len();
@@ -118,6 +121,7 @@ pub fn save_session(
     let session = ChatSession {
         id: id.clone(),
         name,
+        codeagent_session_id: codeagent_session_id.or(preserved_codeagent_session_id),
         messages,
         created_at,
         updated_at: now,

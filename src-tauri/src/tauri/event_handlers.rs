@@ -64,11 +64,13 @@ pub fn emit_ai_response(
     request_id: &str,
     delta: &str,
     done: bool,
+    codeagent_session_id: Option<&str>,
 ) -> AppResult<()> {
     let payload = serde_json::json!({
         "request_id": request_id,
         "delta": delta,
         "done": done,
+        "codeagent_session_id": codeagent_session_id,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
 

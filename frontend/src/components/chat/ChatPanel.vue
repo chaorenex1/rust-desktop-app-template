@@ -33,6 +33,7 @@ let aiUnlisten: (() => void) | null = null;
 // 历史记录相关
 const showHistoryDialog = ref(false);
 const currentSessionId = ref<string | null>(null);
+const currentCodeagentSessionId = ref<string | null>(null);
 
 // 关联文件弹窗
 const showAssociateDialog = ref(false);
@@ -78,6 +79,7 @@ interface AiResponseEventPayload {
   request_id: string;
   delta: string;
   done: boolean;
+  codeagent_session_id?: string | null;
 }
 
 async function setupAiResponseListener() {
@@ -105,6 +107,13 @@ async function setupAiResponseListener() {
         if (data.done) {
           isLoading.value = false;
           currentRequestId.value = null;
+
+          if (data.codeagent_session_id) {
+            currentCodeagentSessionId.value = data.codeagent_session_id;
+          }
+
+          // AI 完成后保存（包含最新的 codeagent session id）
+          void autoSaveChatSession();
         }
       } catch (err) {
         console.error('Failed to handle ai-response event:', err);
@@ -136,9 +145,11 @@ async function autoSaveChatSession() {
     const session = await saveChatSession(
       currentSessionId.value,
       null, // 不自动生成名称，由用户手动命名
-      messages.value
+      messages.value,
+      currentCodeagentSessionId.value
     );
     currentSessionId.value = session.id;
+    currentCodeagentSessionId.value = session.codeagentSessionId || currentCodeagentSessionId.value;
     console.log('Chat session auto-saved:', session.id);
   } catch (error) {
     console.error('Failed to auto-save chat session:', error);
@@ -169,7 +180,13 @@ async function sendMessage() {
   try {
     isLoading.value = true;
     // 调用后端流式 AI 命令，返回本次会话的 requestId
-    const requestId = await sendChatMessageStreaming(content, contextFiles);
+    const requestId = await sendChatMessageStreaming(
+      content,
+      contextFiles,
+      appStore.currentCodeCli,
+      currentCodeagentSessionId.value || undefined,
+      appStore.currentAiModel
+    );
     currentRequestId.value = requestId;
 
     // 先插入一个空内容的 assistant 气泡，后续通过事件流式填充
@@ -185,10 +202,7 @@ async function sendMessage() {
     // Clear message
     message.value = '';
 
-    // 自动保存会话（延迟一点，等AI响应完成）
-    setTimeout(() => {
-      autoSaveChatSession();
-    }, 1000);
+    // 自动保存由 ai-response done 触发
   } catch (error) {
     console.error('Failed to send message:', error);
   } finally {
@@ -200,6 +214,7 @@ async function sendMessage() {
 function loadHistorySession(session: ChatSession) {
   messages.value = session.messages;
   currentSessionId.value = session.id;
+  currentCodeagentSessionId.value = session.codeagentSessionId || null;
   associatedFiles.value = []; // 清空关联文件（历史会话中已包含文件信息）
 }
 
@@ -213,6 +228,7 @@ function clearChat() {
     .then(() => {
       messages.value = [];
       currentSessionId.value = null; // 清空当前会话ID
+      currentCodeagentSessionId.value = null;
     })
     .catch(() => {
       // 用户取消

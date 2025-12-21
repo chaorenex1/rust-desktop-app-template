@@ -8,6 +8,7 @@ use tracing::{info, error};
 pub async fn save_chat_session(
     session_id: Option<String>,
     name: Option<String>,
+    codeagent_session_id: Option<String>,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatSession, String> {
     info!(
@@ -17,7 +18,7 @@ pub async fn save_chat_session(
         messages.len()
     );
 
-    match chat_session::save_session(session_id, name, messages) {
+    match chat_session::save_session(session_id, name, codeagent_session_id, messages) {
         Ok(session) => {
             info!("Successfully saved chat session: {}", session.id);
             Ok(session)

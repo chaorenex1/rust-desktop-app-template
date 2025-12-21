@@ -12,6 +12,12 @@ import type {
   ChatMessage,
 } from '@/utils/types';
 
+export type CodeagentWrapperExecResult = {
+  stdout: string;
+  stderr: string;
+  exit_code: number;
+};
+
 // File system commands
 export async function readFile(path: string): Promise<FileContent> {
   const result = await invoke<{
@@ -93,9 +99,18 @@ export async function sendChatMessage(message: string, contextFiles?: string[]):
 // `ai-response` events while returning a requestId immediately.
 export async function sendChatMessageStreaming(
   message: string,
-  contextFiles?: string[]
+  contextFiles?: string[],
+  codeCli?: string,
+  resumeSessionId?: string,
+  codexModel?: string
 ): Promise<string> {
-  return invoke('send_chat_message_streaming', { message, context_files: contextFiles });
+  return invoke('send_chat_message_streaming', {
+    message,
+    context_files: contextFiles,
+    code_cli: codeCli,
+    resume_session_id: resumeSessionId,
+    codex_model: codexModel,
+  });
 }
 
 export async function getAIModels(): Promise<AIModel[]> {
@@ -113,6 +128,23 @@ export async function executeCommand(
   cwd?: string
 ): Promise<CommandResult> {
   return invoke('execute_command', { command, args, cwd });
+}
+
+// myclaude (codeagent-wrapper) command
+export async function executeCodeagentWrapper(
+  args: string[],
+  options?: {
+    binaryPath?: string;
+    cwd?: string;
+    env?: Record<string, string>;
+  }
+): Promise<CodeagentWrapperExecResult> {
+  return invoke('execute_codeagent_wrapper', {
+    binary_path: options?.binaryPath,
+    args,
+    cwd: options?.cwd,
+    env: options?.env,
+  });
 }
 
 export async function executeTerminalCommand(
@@ -312,12 +344,14 @@ export async function clearRecentDirectories(): Promise<void> {
 export async function saveChatSession(
   sessionId: string | null,
   name: string | null,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  codeagentSessionId?: string | null
 ): Promise<ChatSession> {
   return invoke('save_chat_session', {
     sessionId,
     name,
     messages,
+    codeagent_session_id: codeagentSessionId,
   });
 }
 

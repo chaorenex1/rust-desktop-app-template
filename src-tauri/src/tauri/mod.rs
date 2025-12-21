@@ -7,3 +7,4 @@ pub mod workspace_command;
 pub mod fs_command;
 pub mod chat_session_commands;
 pub mod notification_commands;
+pub mod codeagent_commands;
