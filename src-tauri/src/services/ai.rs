@@ -181,14 +181,16 @@ impl AiService {
         _context_files: Option<Vec<String>>,
         options: AiChatOptions,
     ) -> AppResult<AiMessageResult> {
-        info!("Sending message to AI: {}", message);
+        info!("Sending message to AI: {} {:?}", message, options);
 
         // Prefer codeagent-wrapper when available.
-        let backend = self
-            .codeagent
-            .backend
-            .clone()
-            .or_else(|| options.code_cli.as_deref().and_then(Self::derive_backend_from_code_cli))
+        // IMPORTANT: UI-selected `code_cli` should take precedence over any persisted config,
+        // otherwise users see a mismatch (e.g. code_cli=gemini-cli but backend=claude).
+        let backend = options
+            .code_cli
+            .as_deref()
+            .and_then(Self::derive_backend_from_code_cli)
+            .or_else(|| self.codeagent.backend.clone())
             .unwrap_or_else(|| self.derive_backend_from_current_model());
 
         let workdir = self
@@ -395,7 +397,7 @@ impl AiService {
             }
 
             // Always use stdin mode to avoid shell quoting issues.
-            args.push("-".to_string());
+            args.push(spec.task.to_string());
             args.push(spec.workdir.clone());
         }
 

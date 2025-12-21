@@ -106,10 +106,10 @@ export async function sendChatMessageStreaming(
 ): Promise<string> {
   return invoke('send_chat_message_streaming', {
     message,
-    context_files: contextFiles,
-    code_cli: codeCli,
-    resume_session_id: resumeSessionId,
-    codex_model: codexModel,
+    contextFiles,
+    codeCli,
+    resumeSessionId,
+    codexModel,
   });
 }
 

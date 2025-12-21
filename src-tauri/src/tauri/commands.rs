@@ -38,6 +38,12 @@ pub async fn send_chat_message_streaming(
     codex_model: Option<String>,
 ) -> Result<String, String> {
     info!("Sending chat message (streaming): {}", message);
+    info!(
+        code_cli = ?code_cli,
+        resume_session_id = ?resume_session_id,
+        codex_model = ?codex_model,
+        "Streaming chat options"
+    );
 
     // 为本次会话生成唯一 request_id，前端用它关联流式回复
     let request_id = uuid::Uuid::new_v4().to_string();
