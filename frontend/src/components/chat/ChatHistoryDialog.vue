@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { ElDialog, ElInput, ElButton, ElIcon, ElMessage, ElMessageBox, ElEmpty } from 'element-plus';
 import { Search, Delete, Edit, Loading, Clock } from '@element-plus/icons-vue';
 
@@ -15,6 +15,50 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void;
   (e: 'load-session', session: ChatSession): void;
 }>();
+
+type RawChatSession = ChatSession &
+  Partial<{
+    created_at: string;
+    updated_at: string;
+    message_count: number;
+    first_message_preview: string;
+  }>;
+
+const TIMESTAMP_FRACTION_REGEX = /\.(\d{3})\d+/;
+
+function parseTimestamp(value?: string | null): Date | null {
+  if (!value) return null;
+  const normalized = value.replace(TIMESTAMP_FRACTION_REGEX, '.$1');
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function formatTimestamp(
+  value?: string | null,
+  type: 'datetime' | 'time' = 'datetime',
+  options?: Intl.DateTimeFormatOptions
+): string {
+  const date = parseTimestamp(value);
+  if (!date) return value || '--';
+  if (type === 'time') {
+    return date.toLocaleTimeString('zh-CN', options);
+  }
+  return date.toLocaleString('zh-CN', options);
+}
+
+function normalizeSession(session: RawChatSession): ChatSession {
+  return {
+    ...session,
+    createdAt: session.createdAt || session.created_at || '',
+    updatedAt: session.updatedAt || session.updated_at || '',
+    messageCount:
+      session.messageCount ??
+      session.message_count ??
+      session.messages?.length ??
+      0,
+    firstMessagePreview: session.firstMessagePreview || session.first_message_preview || '',
+  };
+}
 
 // 状态
 const searchQuery = ref('');
@@ -41,7 +85,7 @@ async function loadSessions() {
   loading.value = true;
   try {
     const result = await loadChatSessions(50); // 默认加载50个
-    sessions.value = result;
+    sessions.value = result.map((session) => normalizeSession(session as RawChatSession));
     console.log(`Loaded ${result.length} chat sessions`);
   } catch (error) {
     console.error('Failed to load chat sessions:', error);
@@ -121,7 +165,9 @@ async function saveSessionName(session: ChatSession) {
   }
 
   try {
-    const updated = await updateChatSessionName(session.id, editingName.value.trim());
+    const updated = normalizeSession(
+      (await updateChatSessionName(session.id, editingName.value.trim())) as RawChatSession
+    );
     const index = sessions.value.findIndex((s) => s.id === session.id);
     if (index !== -1) {
       sessions.value[index] = updated;
@@ -145,6 +191,15 @@ function cancelEditing() {
 onMounted(() => {
   loadSessions();
 });
+
+watch(
+  () => props.modelValue,
+  (isOpen) => {
+    if (isOpen) {
+      loadSessions();
+    }
+  }
+);
 </script>
 
 <template>
@@ -198,8 +253,10 @@ onMounted(() => {
                 @keyup.esc="cancelEditing"
               >
                 <template #append>
-                  <ElButton @click="saveSessionName(session)">保存</ElButton>
-                  <ElButton @click="cancelEditing">取消</ElButton>
+                  <div class="flex space-x-1 min-w-[120px] justify-end">
+                    <ElButton size="small" @click="saveSessionName(session)">保存</ElButton>
+                    <ElButton size="small" @click="cancelEditing">取消</ElButton>
+                  </div>
                 </template>
               </ElInput>
             </div>
@@ -230,7 +287,7 @@ onMounted(() => {
             <div class="flex items-center text-xs text-text-secondary space-x-2 mb-1">
               <span>{{ session.messageCount }} 条消息</span>
               <span>·</span>
-              <span>{{ new Date(session.updatedAt).toLocaleString('zh-CN') }}</span>
+              <span>{{ formatTimestamp(session.updatedAt) }}</span>
             </div>
 
             <!-- 首条消息预览 -->
@@ -259,8 +316,8 @@ onMounted(() => {
               {{ selectedSession.name || '未命名会话' }}
             </div>
             <div class="text-xs text-text-secondary">
-              创建于 {{ new Date(selectedSession.createdAt).toLocaleString('zh-CN') }} · 更新于
-              {{ new Date(selectedSession.updatedAt).toLocaleString('zh-CN') }} · {{ selectedSession.messageCount }} 条消息
+              创建于 {{ formatTimestamp(selectedSession.createdAt) }} · 更新于
+              {{ formatTimestamp(selectedSession.updatedAt) }} · {{ selectedSession.messageCount }} 条消息
             </div>
           </div>
 
@@ -281,10 +338,14 @@ onMounted(() => {
                 </div>
                 <div class="mt-1 text-[11px] opacity-70 text-right">
                   {{
-                    new Date(msg.timestamp).toLocaleTimeString('zh-CN', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
+                    formatTimestamp(
+                      msg.timestamp,
+                      'time',
+                      {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }
+                    )
                   }}
                 </div>
               </div>
