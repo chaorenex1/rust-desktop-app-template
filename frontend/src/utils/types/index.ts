@@ -19,6 +19,29 @@ export interface AppSettings {
   chat: ChatSettings;
   ai: AISettings;
   paths: PathSettings;
+  models: AIModel[];
+  codeCli: CodeCli[];
+  environmentVariables: EnvironmentVariable[];
+}
+
+export interface EnvironmentVariable {
+  name: string;
+  value: string;
+  isSecret: boolean;
+}
+
+export interface AIModel {
+  id: string;
+  name: string;
+  provider: string;
+  endpoint: string;
+  apiKey?: string;
+}
+
+export interface CodeCli {
+  name: string;
+  command: string;
+  args: string;
 }
 
 export interface EditorSettings {
@@ -60,7 +83,6 @@ export interface PathSettings {
   nodejs: string;
   python: string;
   git: string;
-  dataDirectory: string;
 }
 
 export type Theme = 'light' | 'dark';
@@ -156,19 +178,6 @@ export interface FileContent {
   modified: boolean;
   lineCount: number;
   size: number;
-}
-
-// AI types
-export interface AIModel {
-  id: string;
-  name: string;
-  provider: string;
-  endpoint: string;
-  apiKey?: string;
-  maxTokens: number;
-  temperature: number;
-  topP: number;
-  enabled: boolean;
 }
 
 export interface ChatMessage {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, markRaw } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { Tools, Key, DataAnalysis, Monitor } from '@element-plus/icons-vue';
 
@@ -13,11 +13,11 @@ interface MenuItem {
 }
 
 const menuItems = ref<MenuItem[]>([
-  { path: '/settings/app', name: '应用设置', icon: Tools },
-  { path: '/settings/cli-paths', name: 'CLI 工具路径', icon: Tools },
-  { path: '/settings/environment', name: '环境变量', icon: Key },
-  { path: '/settings/ai-models', name: 'AI 模型', icon: DataAnalysis },
-  { path: '/settings/code-cli', name: 'Code CLI', icon: Monitor },
+  { path: '/settings/app', name: '应用设置', icon: markRaw(Tools) },
+  { path: '/settings/cli-paths', name: 'CLI 工具路径', icon: markRaw(Tools) },
+  { path: '/settings/environment', name: '环境变量', icon: markRaw(Key) },
+  { path: '/settings/ai-models', name: 'AI 模型', icon: markRaw(DataAnalysis) },
+  { path: '/settings/code-cli', name: 'Code CLI', icon: markRaw(Monitor) },
 ]);
 
 const activeMenu = computed(() => route.path);

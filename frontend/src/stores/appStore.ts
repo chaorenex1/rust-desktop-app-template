@@ -69,8 +69,21 @@ export const useAppStore = defineStore('app', () => {
       nodejs: '',
       python: '',
       git: '',
-      dataDirectory: '',
     },
+    codeCli:[
+      { name: 'claude-cli', command: '/usr/bin/claude', args: '' },
+      { name: 'codex-cli', command: '/usr/bin/codex', args: '' },
+      { name: 'gemini-cli', command: '/usr/bin/gemini', args: '' },
+    ],
+    models: [
+      { id: 'claude-4-5', name: 'Claude 4.5', provider: 'Anthropic', endpoint: 'https://api.anthropic.com' },
+      { id: 'gpt-5', name: 'GPT-5', provider: 'OpenAI', endpoint: 'https://api.openai.com' },
+      { id: 'deepseek', name: 'Deepseek', provider: 'Deepseek', endpoint: 'https://api.deepseek.ai' },
+    ],
+    environmentVariables: [
+      { name: 'API_KEY', value: '', isSecret: true },
+      { name: 'PATH', value: '/usr/bin', isSecret: false },
+    ],
   } as AppSettings);
   const settings = ref<AppSettings>(defaultSettings.value);
   const workspaces = ref<Workspace[]>([]);

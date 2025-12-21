@@ -10,17 +10,20 @@ import {
   ElInput,
   ElSwitch,
   ElMessage,
+  ElMessageBox,
 } from 'element-plus';
-import { ref, onMounted } from 'vue';
-import { getSettings, saveSettings as saveTauriSettings } from '@/services/tauri/commands';
+import { ref, computed } from 'vue';
+import {saveSettings as saveTauriSettings } from '@/services/tauri/commands';
+import { useAppStore } from '@/stores';
+import type { EnvironmentVariable } from '@/utils/types';
+import { showSuccess, showError } from '@/utils/toast';
+
+const appStore = useAppStore();
 
 // Environment variables
-const envVars = ref([
-  { name: 'API_KEY', value: 'sk-...****************', isSecret: true },
-  { name: 'PATH', value: '/usr/local/bin:/usr/bin:/bin', isSecret: false },
-]);
+const envVars = computed(() => appStore.settings.environmentVariables);
 
-const newEnvVar = ref({ name: '', value: '', isSecret: false });
+const newEnvVar = ref<EnvironmentVariable>({ name: '', value: '', isSecret: false });
 const showEnvVarDialog = ref(false);
 const editingEnvVarIndex = ref<number | null>(null);
 
@@ -38,12 +41,12 @@ function addEnvVar() {
   if (editingEnvVarIndex.value !== null) {
     // 编辑模式
     envVars.value[editingEnvVarIndex.value] = { ...newEnvVar.value };
-    ElMessage.success('环境变量已更新');
+    showSuccess('环境变量已更新');
     editingEnvVarIndex.value = null;
   } else {
     // 新增模式
     envVars.value.push({ ...newEnvVar.value });
-    ElMessage.success('环境变量已添加');
+    showSuccess('环境变量已添加');
   }
   newEnvVar.value = { name: '', value: '', isSecret: false };
   showEnvVarDialog.value = false;
@@ -64,10 +67,15 @@ function editEnvVar(index: number) {
 
 function removeEnvVar(index: number) {
   const envVar = envVars.value[index];
-  if (confirm(`确定要删除环境变量 "${envVar?.name}" 吗？`)) {
-    envVars.value.splice(index, 1);
-    ElMessage.success('环境变量已删除');
-  }
+  ElMessageBox.confirm(`确定要删除环境变量 "${envVar?.name}" 吗？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(async () => {
+      envVars.value.splice(index, 1);
+      showSuccess('环境变量已删除');
+    });
 }
 
 function openEnvVarDialog() {
@@ -79,55 +87,45 @@ function openEnvVarDialog() {
 // Save settings
 async function saveSettings() {
   try {
-    const settingsToSave: Record<string, any> = {};
-
-    // 保存环境变量
-    envVars.value.forEach((envVar) => {
-      settingsToSave[`env.${envVar.name}`] = JSON.stringify({
-        value: envVar.value,
-        isSecret: envVar.isSecret,
-      });
-    });
-
-    await saveTauriSettings(settingsToSave);
-    ElMessage.success('环境变量已保存');
+    await saveTauriSettings(JSON.stringify(appStore.settings));
+    showSuccess('环境变量已保存');
   } catch (error) {
     console.error('Failed to save environment variables:', error);
-    ElMessage.error('保存失败: ' + (error as Error).message);
+    showError('保存失败: ' + (error as Error).message);
   }
 }
 
 // Load settings
-async function loadSettings() {
-  try {
-    const settings = await getSettings();
+// async function loadSettings() {
+//   try {
+//     const settings = await getSettings();
 
-    // 加载环境变量
-    const loadedEnvVars: typeof envVars.value = [];
-    Object.keys(settings).forEach((key) => {
-      if (key.startsWith('env.')) {
-        const envName = key.substring(4);
-        const envData =
-          typeof settings[key] === 'string' ? JSON.parse(settings[key]) : settings[key];
-        loadedEnvVars.push({
-          name: envName,
-          value: envData.value || '',
-          isSecret: envData.isSecret || false,
-        });
-      }
-    });
-    if (loadedEnvVars.length > 0) {
-      envVars.value = loadedEnvVars;
-    }
-  } catch (error) {
-    console.error('Failed to load environment variables:', error);
-    ElMessage.warning('加载设置失败，使用默认值');
-  }
-}
+//     // 加载环境变量
+//     const loadedEnvVars: typeof envVars.value = [];
+//     Object.keys(settings).forEach((key) => {
+//       if (key.startsWith('env.')) {
+//         const envName = key.substring(4);
+//         const envData =
+//           typeof settings[key] === 'string' ? JSON.parse(settings[key]) : settings[key];
+//         loadedEnvVars.push({
+//           name: envName,
+//           value: envData.value || '',
+//           isSecret: envData.isSecret || false,
+//         });
+//       }
+//     });
+//     if (loadedEnvVars.length > 0) {
+//       envVars.value = loadedEnvVars;
+//     }
+//   } catch (error) {
+//     console.error('Failed to load environment variables:', error);
+//     ElMessage.warning('加载设置失败，使用默认值');
+//   }
+// }
 
-onMounted(() => {
-  loadSettings();
-});
+// onMounted(() => {
+//   loadSettings();
+// });
 </script>
 
 <template>

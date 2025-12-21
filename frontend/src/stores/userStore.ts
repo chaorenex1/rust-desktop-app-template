@@ -57,7 +57,8 @@ export const useUserStore = defineStore('user', () => {
       const user: User = {
         id: crypto.randomUUID(),
         email,
-        name: email.split('@')[0],
+        name: email.split('@')[0] || '',
+        role: 'user',
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email)}&background=random`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

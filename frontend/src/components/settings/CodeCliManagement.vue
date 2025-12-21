@@ -9,17 +9,21 @@ import {
   ElFormItem,
   ElInput,
   ElMessage,
+  ElMessageBox
 } from 'element-plus';
-import { ref, onMounted } from 'vue';
-import { getSettings, saveSettings as saveTauriSettings } from '@/services/tauri/commands';
+import { ref,computed } from 'vue';
+import { saveSettings as saveTauriSettings } from '@/services/tauri/commands';
+import { useAppStore } from '@/stores';
+import type { CodeCli } from '@/utils/types';
+import { showSuccess, showError } from '@/utils/toast';
 
+const appStore = useAppStore();
 // Code CLIs
-const codeClis = ref([
-  { name: 'OpenAI-Codex', command: '/usr/bin/codex', args: '--model gpt-4' },
-  { name: 'Local-Coder', command: '/usr/local/bin/coder', args: '--local' },
-]);
+const codeClis = computed(() => {
+  return appStore.settings.codeCli
+});
 
-const newCodeCli = ref({ name: '', command: '', args: '' });
+const newCodeCli = ref<CodeCli>({ name: '', command: '', args: '' });
 const showCodeCliDialog = ref(false);
 const editingCodeCliIndex = ref<number | null>(null);
 
@@ -63,10 +67,15 @@ function editCodeCli(index: number) {
 
 function removeCodeCli(index: number) {
   const codeCli = codeClis.value[index];
-  if (confirm(`确定要删除 Code CLI "${codeCli?.name}" 吗？`)) {
-    codeClis.value.splice(index, 1);
-    ElMessage.success('Code CLI已删除');
-  }
+  ElMessageBox.confirm(`确定要删除 Code CLI "${codeCli?.name}" 吗？`, '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      codeClis.value.splice(index, 1);
+      showSuccess('Code CLI已删除');
+    });
 }
 
 function openCodeCliDialog() {
@@ -78,55 +87,46 @@ function openCodeCliDialog() {
 // Save settings
 async function saveSettings() {
   try {
-    const settingsToSave: Record<string, any> = {};
-
-    // 保存 Code CLI 配置
-    codeClis.value.forEach((cli, index) => {
-      settingsToSave[`cli.code.${index}`] = JSON.stringify({
-        name: cli.name,
-        command: cli.command,
-        args: cli.args,
-      });
-    });
-
-    await saveTauriSettings(settingsToSave);
-    ElMessage.success('Code CLI 配置已保存');
+    console.debug('Saving settings:', appStore.settings);
+    appStore.settings.ai.code_cli = codeClis.value.map((cli) => cli.name);
+    await saveTauriSettings(JSON.stringify(appStore.settings));
+    showSuccess('Code CLI 配置已保存');
   } catch (error) {
     console.error('Failed to save Code CLIs:', error);
-    ElMessage.error('保存失败: ' + (error as Error).message);
+    showError('保存失败: ' + (error as Error).message);
   }
 }
 
-// Load settings
-async function loadSettings() {
-  try {
-    const settings = await getSettings();
+// // Load settings
+// async function loadSettings() {
+//   try {
+//     const settings = await getSettings();
 
-    // 加载 Code CLI 配置
-    const loadedCodeClis: typeof codeClis.value = [];
-    Object.keys(settings).forEach((key) => {
-      if (key.startsWith('cli.code.')) {
-        const cliData =
-          typeof settings[key] === 'string' ? JSON.parse(settings[key]) : settings[key];
-        loadedCodeClis.push({
-          name: cliData.name || '',
-          command: cliData.command || '',
-          args: cliData.args || '',
-        });
-      }
-    });
-    if (loadedCodeClis.length > 0) {
-      codeClis.value = loadedCodeClis;
-    }
-  } catch (error) {
-    console.error('Failed to load Code CLIs:', error);
-    ElMessage.warning('加载设置失败，使用默认值');
-  }
-}
+//     // 加载 Code CLI 配置
+//     const loadedCodeClis: typeof codeClis.value = [];
+//     Object.keys(settings).forEach((key) => {
+//       if (key.startsWith('cli.code.')) {
+//         const cliData =
+//           typeof settings[key] === 'string' ? JSON.parse(settings[key]) : settings[key];
+//         loadedCodeClis.push({
+//           name: cliData.name || '',
+//           command: cliData.command || '',
+//           args: cliData.args || '',
+//         });
+//       }
+//     });
+//     if (loadedCodeClis.length > 0) {
+//       codeClis.value = loadedCodeClis;
+//     }
+//   } catch (error) {
+//     console.error('Failed to load Code CLIs:', error);
+//     ElMessage.warning('加载设置失败，使用默认值');
+//   }
+// }
 
-onMounted(() => {
-  loadSettings();
-});
+// onMounted(() => {
+//   loadSettings();
+// });
 </script>
 
 <template>

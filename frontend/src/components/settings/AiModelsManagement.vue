@@ -9,17 +9,19 @@ import {
   ElFormItem,
   ElInput,
   ElMessage,
+  ElMessageBox,
 } from 'element-plus';
-import { ref, onMounted } from 'vue';
-import { getSettings, saveSettings as saveTauriSettings } from '@/services/tauri/commands';
+import { ref, computed } from 'vue';
+import { saveSettings as saveTauriSettings } from '@/services/tauri/commands';
+import { useAppStore } from '@/stores';
+import type { AIModel } from '@/utils/types';
+import { showSuccess, showError } from '@/utils/toast';
 
+const appStore = useAppStore();
 // AI models
-const aiModels = ref([
-  { name: 'Claude-3.5-Sonnet', endpoint: 'api.anthropic.com/v1', apiKey: '********' },
-  { name: 'GPT-4', endpoint: 'api.openai.com/v1', apiKey: '********' },
-]);
+const aiModels = computed(() => useAppStore().settings.models);
 
-const newAiModel = ref({ name: '', endpoint: '', apiKey: '' });
+const newAiModel = ref<AIModel>({ name: '', endpoint: '', apiKey: '', provider: '', id: '' });
 const showAiModelDialog = ref(false);
 const editingAiModelIndex = ref<number | null>(null);
 
@@ -43,19 +45,19 @@ function addAiModel() {
         // 如果没有输入新密钥，保留原密钥
         apiKey: newAiModel.value.apiKey || currentModel.apiKey,
       };
-      ElMessage.success('模型已更新');
+      showSuccess('模型已更新');
     }
     editingAiModelIndex.value = null;
   } else {
     // 新增模式
-    if (!newAiModel.value.apiKey.trim()) {
+    if (!newAiModel.value.apiKey) {
       ElMessage.warning('请输入API密钥');
       return;
     }
     aiModels.value.push({ ...newAiModel.value });
     ElMessage.success('模型已添加');
   }
-  newAiModel.value = { name: '', endpoint: '', apiKey: '' };
+  newAiModel.value = { name: '', endpoint: '', apiKey: '', provider: '', id: '' };
   showAiModelDialog.value = false;
 }
 
@@ -67,6 +69,8 @@ function editAiModel(index: number) {
       name: model.name,
       endpoint: model.endpoint,
       apiKey: '', // 编辑时不显示原密钥
+      provider: model.provider,
+      id: model.id,
     };
     showAiModelDialog.value = true;
   }
@@ -74,70 +78,68 @@ function editAiModel(index: number) {
 
 function removeAiModel(index: number) {
   const model = aiModels.value[index];
-  if (confirm(`确定要删除模型 "${model?.name}" 吗？`)) {
-    aiModels.value.splice(index, 1);
-    ElMessage.success('模型已删除');
-  }
+  ElMessageBox.confirm('确定要删除模型 "' + model?.name + '" 吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => {
+      aiModels.value.splice(index, 1);
+      showSuccess('模型已删除');
+    });
 }
 
 function openAiModelDialog() {
   editingAiModelIndex.value = null;
-  newAiModel.value = { name: '', endpoint: '', apiKey: '' };
+  newAiModel.value = { name: '', endpoint: '', apiKey: '', provider: '', id: '' };
   showAiModelDialog.value = true;
 }
 
 // Save settings
 async function saveSettings() {
   try {
-    const settingsToSave: Record<string, any> = {};
-
-    // 保存 AI 模型配置
-    aiModels.value.forEach((model, index) => {
-      settingsToSave[`ai.models.${index}`] = JSON.stringify({
-        name: model.name,
-        endpoint: model.endpoint,
-        apiKey: model.apiKey,
-      });
-    });
-
-    await saveTauriSettings(settingsToSave);
-    ElMessage.success('AI 模型配置已保存');
+    console.debug('Saving settings:', appStore.settings);
+    appStore.settings.ai.model_list = aiModels.value.map((model) => model.id);
+    await saveTauriSettings(JSON.stringify(appStore.settings));
+    showSuccess('设置已保存');
   } catch (error) {
     console.error('Failed to save AI models:', error);
-    ElMessage.error('保存失败: ' + (error as Error).message);
+    showError('保存失败: ' + (error as Error).message);
   }
 }
 
 // Load settings
-async function loadSettings() {
-  try {
-    const settings = await getSettings();
+// async function loadSettings() {
+//   try {
+//     const settings = await getSettings();
 
-    // 加载 AI 模型配置
-    const loadedAiModels: typeof aiModels.value = [];
-    Object.keys(settings).forEach((key) => {
-      if (key.startsWith('ai.models.')) {
-        const modelData =
-          typeof settings[key] === 'string' ? JSON.parse(settings[key]) : settings[key];
-        loadedAiModels.push({
-          name: modelData.name || '',
-          endpoint: modelData.endpoint || '',
-          apiKey: modelData.apiKey || '********',
-        });
-      }
-    });
-    if (loadedAiModels.length > 0) {
-      aiModels.value = loadedAiModels;
-    }
-  } catch (error) {
-    console.error('Failed to load AI models:', error);
-    ElMessage.warning('加载设置失败，使用默认值');
-  }
-}
+//     // 加载 AI 模型配置
+//     const loadedAiModels: typeof aiModels.value = [];
+//     Object.keys(settings).forEach((key) => {
+//       if (key.startsWith('ai.models.')) {
+//         const modelData =
+//           typeof settings[key] === 'string' ? JSON.parse(settings[key]) : settings[key];
+//         loadedAiModels.push({
+//           name: modelData.name || '',
+//           endpoint: modelData.endpoint || '',
+//           apiKey: modelData.apiKey || '',
+//           provider: modelData.provider || '',
+//           id: modelData.id || '',
+//         });
+//       }
+//     });
+//     if (loadedAiModels.length > 0) {
+//       aiModels.value = loadedAiModels;
+//     }
+//   } catch (error) {
+//     console.error('Failed to load AI models:', error);
+//     ElMessage.warning('加载设置失败，使用默认值');
+//   }
+// }
 
-onMounted(() => {
-  loadSettings();
-});
+// onMounted(() => {
+//   loadSettings();
+// });
 </script>
 
 <template>
@@ -154,7 +156,9 @@ onMounted(() => {
 
     <div class="settings-content bg-surface rounded-lg border border-border p-6 shadow-sm mt-6">
       <ElTable v-if="aiModels.length > 0" :data="aiModels" style="width: 100%">
+        <ElTableColumn prop="id" label="ID" width="150" />
         <ElTableColumn prop="name" label="模型名称" width="200" />
+        <ElTableColumn prop="provider" label="提供者" width="150" />
         <ElTableColumn prop="endpoint" label="API端点" />
         <ElTableColumn prop="apiKey" label="API密钥" width="150">
           <template #default>
@@ -191,6 +195,12 @@ onMounted(() => {
       width="500px"
     >
       <ElForm :model="newAiModel" label-width="100px">
+        <ElFormItem label="提供者">
+          <ElInput v-model="newAiModel.provider" placeholder="例: Anthropic" />
+        </ElFormItem>
+        <ElFormItem label="ID">
+          <ElInput v-model="newAiModel.id" placeholder="例: abc123" />
+        </ElFormItem>
         <ElFormItem label="模型名称">
           <ElInput v-model="newAiModel.name" placeholder="例: Claude-3.5-Sonnet" />
         </ElFormItem>

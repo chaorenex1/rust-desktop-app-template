@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import CodeCliManagement from '../../components/settings/CodeCliManagement.vue';
+import CodeCliManagement from '@/components/settings/CodeCliManagement.vue';
 
 const router = useRouter();
 

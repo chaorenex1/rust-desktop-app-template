@@ -4,6 +4,7 @@ use sea_orm_migration::prelude::*;
 
 mod m20250101_000001_create_settings_table;
 mod m20251219_132921_create_workspace_table;
+mod m20251221_101715_create_conversion_table;
 
 
 pub struct Migrator;
@@ -14,6 +15,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(m20250101_000001_create_settings_table::Migration),
             Box::new(m20251219_132921_create_workspace_table::Migration),
+            Box::new(m20251221_101715_create_conversion_table::Migration),
         ]
     }
 }

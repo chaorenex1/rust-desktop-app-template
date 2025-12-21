@@ -45,8 +45,8 @@ function goBack() {
       <div class="settings-page-wrapper">
         <div class="settings-page-header">
           <div class="settings-page-header-main">
-            <h2 class="text-2xl font-bold">AI 模型管理</h2>
-            <p class="text-sm text-gray-500 mt-2">配置和管理 AI 模型设置</p>
+            <h2 class="text-2xl font-bold">设置</h2>
+            <p class="text-sm text-gray-500 mt-2">应用设置</p>
           </div>
           <button type="button" class="back-button" @click="goBack">返回</button>
         </div>
