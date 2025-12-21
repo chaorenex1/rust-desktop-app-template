@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ElForm, ElFormItem, ElInput, ElButton, ElMessage, ElMessageBox } from 'element-plus';
-import { ref, computed } from 'vue';
+import { ElForm, ElFormItem, ElInput, ElButton } from 'element-plus';
+import { computed } from 'vue';
 import {saveSettings as saveTauriSettings } from '@/services/tauri/commands';
 import { useAppStore } from '@/stores';
 import { showSuccess, showError } from '@/utils/toast';

@@ -212,7 +212,7 @@ export const useFileStore = defineStore('files', () => {
       }
 
       // Delete file
-      await deleteFileCommand(path, false);
+      await deleteFileCommand(path);
 
       // 删除相关目录缓存，强制重新加载
       removeDirectoryCache(currentDirectory.value);

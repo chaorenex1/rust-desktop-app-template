@@ -3,7 +3,7 @@ import { Search, Delete, VideoPause, VideoPlay } from '@element-plus/icons-vue';
 import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElMessageBox } from 'element-plus';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 
-import { getLogs, clearLogs as clearLogsCommand } from '@/services/tauri/commands';
+import { getLogs } from '@/services/tauri/commands';
 
 const logs = ref<string[]>([]);
 

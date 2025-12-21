@@ -2,7 +2,7 @@
 import { Document, FolderOpened } from '@element-plus/icons-vue';
 import { ElTabs, ElTabPane, ElButton, ElIcon, ElTooltip, ElMessageBox } from 'element-plus';
 import monaco from '@/utils/monaco';
-import { ref, onBeforeUnmount, onBeforeUpdate, watch, nextTick, computed, toRaw } from 'vue';
+import { ref, onBeforeUnmount, onBeforeUpdate, watch, nextTick, toRaw } from 'vue';
 
 import { useFileStore, useAppStore } from '@/stores';
 
@@ -68,10 +68,10 @@ function simpleHash(str: string): number {
 }
 
 // 处理路径，兼容 Windows 和 POSIX
-function getFileNameFromPath(path: string): string {
-  const parts = path.split(/[/\\]/);
-  return parts[parts.length - 1] || path;
-}
+// function getFileNameFromPath(path: string): string {
+//   const parts = path.split(/[/\\]/);
+//   return parts[parts.length - 1] || path;
+// }
 
 // const duplicateNames = computed(() => {
 //   const counts = new Map<string, number>();

@@ -52,6 +52,8 @@ export const useUserStore = defineStore('user', () => {
       authState.value = 'loading';
       // TODO: Implement actual login logic with backend
       // For now, simulate login
+      console.log('Logging in with email:', email);
+      console.log('Logging in with password:', password);
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const user: User = {

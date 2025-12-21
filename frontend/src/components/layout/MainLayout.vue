@@ -101,16 +101,16 @@ function openSettings() {
 }
 
 // Load recent directories from backend
-async function loadRecentDirectories() {
-  try {
-    recentDirectories.value = appStore.workspaces.filter(
-      (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory
-    );
-  } catch (error) {
-    console.error('加载最近目录失败', error);
-    recentDirectories.value = [];
-  }
-}
+// async function loadRecentDirectories() {
+//   try {
+//     recentDirectories.value = appStore.workspaces.filter(
+//       (workspace) => workspace.path && workspace.path !== fileStore.getRootDirectory
+//     );
+//   } catch (error) {
+//     console.error('加载最近目录失败', error);
+//     recentDirectories.value = [];
+//   }
+// }
 
 // Open a recent directory from header dropdown
 async function openRecentDirectoryFromHeader(dir: Workspace) {

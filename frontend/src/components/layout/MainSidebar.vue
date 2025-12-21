@@ -9,8 +9,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  resizeStart: [event: MouseEvent];
-  updateWidth: [width: number];
+  'resize-reset': [width: number];
+  'updateWidth': [width: number];
+  
 }>();
 
 // 拉伸功能相关
@@ -69,7 +70,7 @@ function handleResizeEnd() {
     <div
       class="sidebar-resizer"
       @mousedown="handleResizeStart"
-      @dblclick="() => emit('resize-reset')"
+      @dblclick="() => emit('resize-reset', sidebarWidth)"
     />
   </template>
 </template>

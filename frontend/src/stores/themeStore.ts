@@ -84,19 +84,19 @@ export const useThemeStore = defineStore('theme', () => {
     localStorage.setItem('colorScheme', colorScheme.value);
   };
 
-  const loadFromStorage = () => {
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    const savedColorScheme = localStorage.getItem('colorScheme') as ColorScheme | null;
+  // const loadFromStorage = () => {
+  //   const savedTheme = localStorage.getItem('theme') as Theme | null;
+  //   const savedColorScheme = localStorage.getItem('colorScheme') as ColorScheme | null;
 
-    if (savedTheme) {
-      currentTheme.value = savedTheme;
-    }
-    if (savedColorScheme) {
-      colorScheme.value = savedColorScheme;
-    }
+  //   if (savedTheme) {
+  //     currentTheme.value = savedTheme;
+  //   }
+  //   if (savedColorScheme) {
+  //     colorScheme.value = savedColorScheme;
+  //   }
 
-    applyTheme();
-  };
+  //   applyTheme();
+  // };
 
   const resetToDefaults = () => {
     currentTheme.value = 'light';

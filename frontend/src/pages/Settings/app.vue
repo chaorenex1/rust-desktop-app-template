@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   ElButton,
@@ -10,8 +10,6 @@ import {
   ElSwitch,
   ElSelect,
   ElOption,
-  ElMessage,
-  ElPageHeader,
 } from 'element-plus';
 import { useAppStore } from '@/stores';
 import { showSuccess } from '@/utils/toast';

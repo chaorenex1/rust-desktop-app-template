@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
   Folder,
-  Document,
   Plus,
   Refresh,
   Search,
@@ -14,14 +13,11 @@ import {
 import { ElTree, ElInput, ElButton, ElIcon, ElMessageBox } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
 import { useFileStore } from '@/stores/filesStore';
-import { useAppStore } from '@/stores/appStore';
 import { showError, showWarning, showSuccess } from '@/utils/toast';
-import type { FileItem } from '@/utils/types';
+import type { FileIconConfig } from '@/utils/fileIcons';
 import { getIcon } from '@/utils/fileIcons';
-import { da } from 'element-plus/es/locales.mjs';
 
 const fileStore = useFileStore();
-const appStore = useAppStore();
 
 const searchQuery = ref('');
 const treeRef = ref<InstanceType<typeof ElTree> | null>(null);
@@ -420,7 +416,7 @@ async function handleOpenTerminal(data: FileNode) {
             <div class="context-menu-trigger">
               <ElDropdown
                 trigger="click"
-                @command="(command) => handleContextCommand(command, data)"
+                @command="(command: string) => { handleContextCommand(command, data); }"
               >
                 <span class="el-dropdown-link context-menu-btn">
                   <ElIcon :size="16"><More /></ElIcon>

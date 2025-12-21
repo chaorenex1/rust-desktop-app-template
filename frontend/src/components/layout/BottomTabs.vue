@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElButton, ElButtonGroup } from 'element-plus';
-import { computed } from 'vue';
+// import { computed } from 'vue';
 
 import ChatPanel from '@/components/chat/ChatPanel.vue';
 import OutputPanel from '@/components/output/OutputPanel.vue';
@@ -28,7 +28,7 @@ const emit = defineEmits<{
 const appStore = useAppStore();
 const fileStore = useFileStore();
 
-const currentFile = computed(() => fileStore.currentFile);
+// const currentFile = computed(() => fileStore.currentFile);
 
 function onToggleVisible() {
   emit('update:visible', !props.visible);

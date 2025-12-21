@@ -257,32 +257,32 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('currentShell', JSON.stringify(currentShell.value));
   };
 
-  const loadFromStorage = () => {
-    const storedSettings = localStorage.getItem('appSettings');
-    const storedCurrentWorkspace = localStorage.getItem('currentWorkspace');
-    const storedWorkspaces = localStorage.getItem('workspaces');
-    const storedCurrentAiModel = localStorage.getItem('currentAiModel');
-    const storedCurrentCodeCli = localStorage.getItem('currentCodeCli');
-    const storedCurrentShell = localStorage.getItem('currentShell');
-    if (storedCurrentWorkspace) {
-      currentWorkspace.value = JSON.parse(storedCurrentWorkspace);
-    }
-    if (storedWorkspaces) {
-      workspaces.value = JSON.parse(storedWorkspaces);
-    }
-    if (storedSettings) {
-      settings.value = JSON.parse(storedSettings);
-    }
-    if (storedCurrentShell) {
-      currentShell.value = JSON.parse(storedCurrentShell);
-    }
-    if (storedCurrentAiModel) {
-      currentAiModel.value = JSON.parse(storedCurrentAiModel);
-    }
-    if (storedCurrentCodeCli) {
-      currentCodeCli.value = JSON.parse(storedCurrentCodeCli);
-    }
-  };
+  // const loadFromStorage = () => {
+  //   const storedSettings = localStorage.getItem('appSettings');
+  //   const storedCurrentWorkspace = localStorage.getItem('currentWorkspace');
+  //   const storedWorkspaces = localStorage.getItem('workspaces');
+  //   const storedCurrentAiModel = localStorage.getItem('currentAiModel');
+  //   const storedCurrentCodeCli = localStorage.getItem('currentCodeCli');
+  //   const storedCurrentShell = localStorage.getItem('currentShell');
+  //   if (storedCurrentWorkspace) {
+  //     currentWorkspace.value = JSON.parse(storedCurrentWorkspace);
+  //   }
+  //   if (storedWorkspaces) {
+  //     workspaces.value = JSON.parse(storedWorkspaces);
+  //   }
+  //   if (storedSettings) {
+  //     settings.value = JSON.parse(storedSettings);
+  //   }
+  //   if (storedCurrentShell) {
+  //     currentShell.value = JSON.parse(storedCurrentShell);
+  //   }
+  //   if (storedCurrentAiModel) {
+  //     currentAiModel.value = JSON.parse(storedCurrentAiModel);
+  //   }
+  //   if (storedCurrentCodeCli) {
+  //     currentCodeCli.value = JSON.parse(storedCurrentCodeCli);
+  //   }
+  // };
 
   return {
     // State

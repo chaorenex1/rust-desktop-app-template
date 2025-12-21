@@ -174,7 +174,7 @@ export function getFileIcon(filename: string): FileIconConfig {
     (key) => filename.toLowerCase() === key.toLowerCase()
   );
   if (dotfileMatch) {
-    return FILENAME_ICONS[dotfileMatch];
+    return FILENAME_ICONS[dotfileMatch] as FileIconConfig;
   }
 
   // Get extension

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Setting, Document, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue';
 import { ElButton, ElCard, ElDialog, ElMessage } from 'element-plus';
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type { Workspace } from '@/utils/types';

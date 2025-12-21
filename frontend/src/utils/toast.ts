@@ -1,4 +1,4 @@
-import type { ToastItem } from '@/components/error';
+// import type { ToastItem } from '@/components/error';
 
 // 全局 toast 容器引用
 let toastContainer: any = null;
