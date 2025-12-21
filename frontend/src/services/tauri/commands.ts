@@ -187,6 +187,11 @@ export async function clearLogs(): Promise<void> {
   return invoke('clear_logs');
 }
 
+// Notification commands
+export async function showSystemNotification(body: string, title?: string): Promise<void> {
+  return invoke('show_system_notification', { title, body });
+}
+
 // Utility commands
 export async function openFileDialog(options?: {
   multiple?: boolean;
