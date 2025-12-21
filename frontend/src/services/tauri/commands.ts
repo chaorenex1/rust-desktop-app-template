@@ -8,6 +8,8 @@ import type {
   CommandResult,
   ApiResponse,
   FileContent,
+  ChatSession,
+  ChatMessage,
 } from '@/utils/types';
 
 // File system commands
@@ -299,4 +301,29 @@ export async function getRecentDirectories(): Promise<RecentDirectory[]> {
 
 export async function clearRecentDirectories(): Promise<void> {
   return invoke('clear_recent_directories');
+}
+
+// Chat session commands
+export async function saveChatSession(
+  sessionId: string | null,
+  name: string | null,
+  messages: ChatMessage[]
+): Promise<ChatSession> {
+  return invoke('save_chat_session', {
+    sessionId,
+    name,
+    messages,
+  });
+}
+
+export async function loadChatSessions(limit?: number): Promise<ChatSession[]> {
+  return invoke('load_chat_sessions', { limit });
+}
+
+export async function deleteChatSession(sessionId: string): Promise<void> {
+  return invoke('delete_chat_session', { sessionId });
+}
+
+export async function updateChatSessionName(sessionId: string, name: string): Promise<ChatSession> {
+  return invoke('update_chat_session_name', { sessionId, name });
 }

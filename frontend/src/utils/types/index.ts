@@ -205,6 +205,16 @@ export interface ChatResponse {
   };
 }
 
+export interface ChatSession {
+  id: string;
+  name?: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  firstMessagePreview: string;
+}
+
 // Terminal types
 export interface TerminalSession {
   id: string;

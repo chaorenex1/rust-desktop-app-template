@@ -4,4 +4,5 @@
 
 pub mod ai;
 pub mod terminal;
+pub mod chat_session;
 

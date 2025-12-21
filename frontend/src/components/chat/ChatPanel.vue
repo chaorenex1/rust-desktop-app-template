@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Link, Delete, Setting, Search, Folder, Document } from '@element-plus/icons-vue';
+import { Link, Delete, Setting, Search, Folder, Document, Clock } from '@element-plus/icons-vue';
 import {
   ElInput,
   ElButton,
@@ -15,8 +15,9 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import { listen } from '@tauri-apps/api/event';
 
 import { useFileStore, useAppStore } from '@/stores';
-import { sendChatMessageStreaming } from '@/services/tauri/commands';
-import type { ChatMessage as ChatMessageType } from '@/utils/types';
+import { sendChatMessageStreaming, saveChatSession } from '@/services/tauri/commands';
+import type { ChatMessage as ChatMessageType, ChatSession } from '@/utils/types';
+import ChatHistoryDialog from './ChatHistoryDialog.vue';
 
 const appStore = useAppStore();
 const fileStore = useFileStore();
@@ -28,6 +29,10 @@ const messages = ref<ChatMessageType[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
 const currentRequestId = ref<string | null>(null);
 let aiUnlisten: (() => void) | null = null;
+
+// 历史记录相关
+const showHistoryDialog = ref(false);
+const currentSessionId = ref<string | null>(null);
 
 // 关联文件弹窗
 const showAssociateDialog = ref(false);
@@ -121,6 +126,25 @@ onBeforeUnmount(() => {
   }
 });
 
+// 自动保存会话
+async function autoSaveChatSession() {
+  if (messages.value.length === 0) {
+    return;
+  }
+
+  try {
+    const session = await saveChatSession(
+      currentSessionId.value,
+      null, // 不自动生成名称，由用户手动命名
+      messages.value
+    );
+    currentSessionId.value = session.id;
+    console.log('Chat session auto-saved:', session.id);
+  } catch (error) {
+    console.error('Failed to auto-save chat session:', error);
+  }
+}
+
 // Send message
 async function sendMessage() {
   if (!message.value.trim() || isLoading.value) {
@@ -160,11 +184,23 @@ async function sendMessage() {
 
     // Clear message
     message.value = '';
+
+    // 自动保存会话（延迟一点，等AI响应完成）
+    setTimeout(() => {
+      autoSaveChatSession();
+    }, 1000);
   } catch (error) {
     console.error('Failed to send message:', error);
   } finally {
     // 结束状态由流式事件在 done 时重置
   }
+}
+
+// Load history session
+function loadHistorySession(session: ChatSession) {
+  messages.value = session.messages;
+  currentSessionId.value = session.id;
+  associatedFiles.value = []; // 清空关联文件（历史会话中已包含文件信息）
 }
 
 // Clear chat
@@ -176,6 +212,7 @@ function clearChat() {
   })
     .then(() => {
       messages.value = [];
+      currentSessionId.value = null; // 清空当前会话ID
     })
     .catch(() => {
       // 用户取消
@@ -349,6 +386,10 @@ function confirmAssociate() {
         </div>
 
         <div class="flex items-center space-x-2">
+          <ElTooltip content="聊天历史" placement="bottom">
+            <ElButton :icon="Clock" size="small" text @click="showHistoryDialog = true" />
+          </ElTooltip>
+
           <ElTooltip content="关联当前文件" placement="bottom">
             <ElButton :icon="Link" size="small" text @click="openAssociateDialog(true)" />
           </ElTooltip>
@@ -482,6 +523,12 @@ function confirmAssociate() {
       </div>
     </template>
   </ElDialog>
+
+  <!-- 聊天历史对话框 -->
+  <ChatHistoryDialog
+    v-model="showHistoryDialog"
+    @load-session="loadHistorySession"
+  />
 </template>
 
 <style scoped>

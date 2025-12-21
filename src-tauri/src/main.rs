@@ -76,6 +76,10 @@ fn main() {
             tauri_module::commands::get_system_info,
             tauri_module::commands::get_logs,
             tauri_module::commands::clear_logs,
+            tauri_module::chat_session_commands::save_chat_session,
+            tauri_module::chat_session_commands::load_chat_sessions,
+            tauri_module::chat_session_commands::delete_chat_session,
+            tauri_module::chat_session_commands::update_chat_session_name,
         ])
 
         // Setup application state
