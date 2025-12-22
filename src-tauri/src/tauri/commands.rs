@@ -71,7 +71,8 @@ pub async fn send_chat_message_streaming(
     let msg = message.clone();
     let ctx_files = context_files.clone();
     let msg_for_spawn = msg.clone();
-    let workspace_id_for_spawn = workspace_id.clone();
+
+    let workspace_id_for_append = workspace_id.clone();
 
     async_runtime::spawn(async move {
         let ai = AiService::new();
@@ -95,6 +96,7 @@ pub async fn send_chat_message_streaming(
                 let chars: Vec<char> = result.message.chars().collect();
                 let total = chars.len();
                 let mut buffer = String::new();
+                let mut full_response = String::new();
 
                 for (idx, ch) in chars.into_iter().enumerate() {
                     buffer.push(ch);
@@ -110,6 +112,7 @@ pub async fn send_chat_message_streaming(
                         } else {
                             None
                         };
+                        full_response.push_str(&delta);
 
                         if let Err(e) = emit_ai_response(
                             &app_handle,
@@ -117,48 +120,46 @@ pub async fn send_chat_message_streaming(
                             &delta,
                             is_last,
                             codeagent_session_id.as_deref(),
-                            workspace_id_for_spawn.as_deref(),
+                            workspace_id_for_append.as_deref(),
                         ) {
                             error!("Failed to emit AI response chunk: {:?}", e);
                             break;
                         }
-                        
-                        let msg_for_inner = msg_for_spawn.clone();
-                        let workspace_for_inner = workspace_id_for_spawn.clone();
-                        let request_id_for_inner = request_id_for_task.clone();
-                        
-                        async_runtime::spawn(async move {
-                            if let Some(session_id) = codeagent_session_id {
-                                let _ = chat_session::append_message_to_session(
-                                    &session_id,
-                                    vec![
-                                        ChatMessage {
-                                            id: uuid::Uuid::new_v4().to_string(),
-                                            role: "role".to_string(),
-                                            content: msg_for_inner.clone(),
-                                            timestamp: chrono::Local::now().to_rfc3339().to_string(),
-                                            files: None,
-                                            session_id: Some(session_id.clone()),
-                                            workspace_id: workspace_for_inner.clone(),
-                                            model: None,
-                                        },
-                                        ChatMessage {
-                                            id: request_id_for_inner,
-                                            role: "assistant".to_string(),
-                                            content: delta.clone(),
-                                            timestamp: chrono::Local::now().to_rfc3339(),
-                                            files: None,
-                                            session_id: Some(session_id.clone()),
-                                            workspace_id: workspace_for_inner.clone(),
-                                            model: None,
-                                        },
-                                    ],
-                                );
-                            }
-                        });
 
                         // 模拟流式延迟效果（阻塞当前后台任务线程即可）
                         std::thread::sleep(Duration::from_millis(60));
+                    }
+                }
+
+                if let Some(session_id) = result.codeagent_session_id.clone() {
+                    let user_message = ChatMessage {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        role: "user".to_string(),
+                        content: msg_for_spawn.clone(),
+                        timestamp: chrono::Local::now().to_rfc3339().to_string(),
+                        files: None,
+                        session_id: Some(session_id.clone()),
+                        workspace_id: workspace_id_for_append.clone(),
+                        model: None,
+                    };
+                    let assistant_message = ChatMessage {
+                        id: request_id_for_task.clone(),
+                        role: "assistant".to_string(),
+                        content: full_response,
+                        timestamp: chrono::Local::now().to_rfc3339(),
+                        files: None,
+                        session_id: Some(session_id.clone()),
+                        workspace_id: workspace_id_for_append.clone(),
+                        model: None,
+                    };
+                    if let Err(e) = chat_session::append_message_to_session(
+                        &session_id,
+                        vec![user_message, assistant_message],
+                    ) {
+                        error!(
+                            "Failed to append chat messages to session {}: {}",
+                            session_id, e
+                        );
                     }
                 }
             }
@@ -170,7 +171,7 @@ pub async fn send_chat_message_streaming(
                     &format!("[AI 错误] {}", e),
                     true,
                     None,
-                    workspace_id_for_spawn.as_deref(),
+                    workspace_id_for_append.as_deref(),
                 );
             }
         }

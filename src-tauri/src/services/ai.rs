@@ -3,6 +3,7 @@
 //! This module handles communication with AI models and CLI tools.
 
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::AsyncWriteExt;
@@ -189,13 +190,29 @@ impl AiService {
 
         let task = if let Some(files) = &_context_files {
             if !files.is_empty() {
-                let mut prefix = files
-                    .iter()
-                    .map(|path| format!("@{}", path))
-                    .collect::<Vec<String>>()
-                    .join("\n");
-                prefix.push_str("\n\n");
-                format!("{}{}", prefix, message)
+                let mut segments: Vec<String> = Vec::new();
+                for file_path in files {
+                    match fs::read_to_string(file_path) {
+                        Ok(content) => {
+                            segments.push(format!("@{}\n{}", file_path, content));
+                        }
+                        Err(err) => {
+                            warn!(
+                                path = %file_path,
+                                error = %err,
+                                "Failed to read context file"
+                            );
+                        }
+                    }
+                }
+
+                if !segments.is_empty() {
+                    let mut prefix = segments.join("\n");
+                    prefix.push_str("\n\n");
+                    format!("{}{}", prefix, message)
+                } else {
+                    message.to_string()
+                }
             } else {
                 message.to_string()
             }
