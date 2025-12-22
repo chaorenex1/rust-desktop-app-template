@@ -97,10 +97,12 @@ pub fn save_session(
         .first()
         .map(|m| {
             let content = &m.content;
-            if content.len() > 100 {
-                format!("{}...", &content[..100])
+            let mut chars = content.chars();
+            let preview: String = chars.by_ref().take(100).collect();
+            if chars.next().is_some() {
+                format!("{}...", preview)
             } else {
-                content.clone()
+                preview
             }
         })
         .unwrap_or_default();
