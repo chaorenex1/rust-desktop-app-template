@@ -9,6 +9,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
+use crate::database::models::workspace;
 use crate::utils::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -40,6 +41,10 @@ pub struct AiChatOptions {
     /// When using codex backend, optional model hint.
     /// Note: upstream `codeagent-wrapper` does not accept `--model`; we pass via env.
     pub codex_model: Option<String>,
+    /// Workspace ID (used for context files).
+    pub workspace_dir: Option<String>,
+    /// Environment variables (mapped to CODEAGENT_ENV).
+    pub env: Vec<(String, String)>,
 }
 
 #[derive(Debug, Clone)]
@@ -61,26 +66,11 @@ pub struct AiModel {
     pub is_active: bool,
 }
 
-/// Code CLI configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CodeCli {
-    /// CLI name
-    pub name: String,
-    /// Command path
-    pub command_path: String,
-    /// Command arguments
-    pub arguments: Vec<String>,
-    /// Is active
-    pub is_active: bool,
-}
-
 /// AI Service for managing AI models and sending messages
 #[derive(Debug)]
 pub struct AiService {
     /// Available AI models
     models: Vec<AiModel>,
-    /// Available Code CLIs
-    code_clis: Vec<CodeCli>,
     /// Current model
     current_model: Option<String>,
     /// HTTP client
@@ -120,7 +110,6 @@ impl AiService {
                     is_active: true,
                 },
             ],
-            code_clis: Vec::new(),
             current_model: Some("claude-3-5-sonnet".to_string()),
             _client: reqwest::Client::new(),
             codeagent: CodeagentWrapperConfig {
@@ -181,7 +170,7 @@ impl AiService {
         _context_files: Option<Vec<String>>,
         options: AiChatOptions,
     ) -> AppResult<AiMessageResult> {
-        info!("Sending message to AI: {} {:?}", message, options);
+        debug!("Sending message to AI: {} {:?}", message, options);
 
         // Prefer codeagent-wrapper when available.
         // IMPORTANT: UI-selected `code_cli` should take precedence over any persisted config,
@@ -192,14 +181,27 @@ impl AiService {
             .and_then(Self::derive_backend_from_code_cli)
             .or_else(|| self.codeagent.backend.clone())
             .unwrap_or_else(|| self.derive_backend_from_current_model());
+        let workdir = options.workspace_dir
+                    .as_deref()
+                    .map(|w| w.to_string())
+                    .or_else(|| self.get_codeagent_config().workdir.clone())
+                    .unwrap_or_else(|| ".".to_string());
 
-        let workdir = self
-            .codeagent
-            .workdir
-            .clone()
-            .unwrap_or_else(|| ".".to_string());
-
-        let task = message.to_string();
+        let task = if let Some(files) = &_context_files {
+            if !files.is_empty() {
+                let mut prefix = files
+                    .iter()
+                    .map(|path| format!("@{}", path))
+                    .collect::<Vec<String>>()
+                    .join("\n");
+                prefix.push_str("\n\n");
+                format!("{}{}", prefix, message)
+            } else {
+                message.to_string()
+            }
+        } else {
+            message.to_string()
+        };
 
         let result = self
             .run_codeagent_wrapper(CodeagentRunSpec {
@@ -213,6 +215,7 @@ impl AiService {
                 resume_session_id: options.resume_session_id,
                 parallel: options.parallel,
                 codex_model: options.codex_model,
+                env: options.env,
             })
             .await?;
 
@@ -230,25 +233,6 @@ impl AiService {
     /// Remove a model
     pub fn remove_model(&mut self, name: &str) {
         self.models.retain(|m| m.name != name);
-    }
-
-    /// Add a new Code CLI
-    pub fn add_code_cli(&mut self, cli: CodeCli) {
-        self.code_clis.push(cli);
-    }
-
-    /// Remove a Code CLI
-    pub fn remove_code_cli(&mut self, name: &str) {
-        self.code_clis.retain(|c| c.name != name);
-    }
-
-    /// Get available Code CLIs
-    pub fn get_code_clis(&self) -> Vec<String> {
-        self.code_clis
-            .iter()
-            .filter(|c| c.is_active)
-            .map(|c| c.name.clone())
-            .collect()
     }
 
     fn derive_backend_from_current_model(&self) -> String {
@@ -385,17 +369,16 @@ impl AiService {
             args.push("--dangerously-skip-permissions".to_string());
         }
 
-        if spec.parallel {
-            // Parallel mode reads task config from stdin and forbids extra args.
-        } else {
-            if let Some(resume) = spec.resume_session_id.as_deref() {
+        if let Some(resume) = spec.resume_session_id.as_deref() {
                 let resume = resume.trim();
                 if !resume.is_empty() {
                     args.push("resume".to_string());
                     args.push(resume.to_string());
                 }
             }
-
+        if spec.parallel {
+                        // Parallel mode reads task config from stdin and forbids extra args.
+        } else {
             // Always use stdin mode to avoid shell quoting issues.
             args.push(spec.task.to_string());
             args.push(spec.workdir.clone());
@@ -431,8 +414,9 @@ impl AiService {
                 }
             }
         }
+        
 
-        info!(
+        debug!(
             codeagent_bin = %bin.display(),
             workdir = %spec.workdir,
             backend = %spec.backend,
@@ -456,6 +440,11 @@ impl AiService {
         if spec.backend.trim().eq_ignore_ascii_case("codex") {
             if let Some(m) = spec.codex_model.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
                 debug!(CODEX_MODEL = %m, "codeagent-wrapper env");
+            }
+        }
+        if !spec.env.is_empty() {
+            for (key, value) in &spec.env {
+                cmd.env(key, value);
             }
         }
 
@@ -539,10 +528,11 @@ struct CodeagentRunSpec {
     timeout_ms: Option<u64>,
     max_parallel_workers: Option<u32>,
     binary_path: Option<String>,
-
     resume_session_id: Option<String>,
     parallel: bool,
     codex_model: Option<String>,
+    env: Vec<(String, String)>,
+    
 }
 
 #[derive(Debug, Clone)]

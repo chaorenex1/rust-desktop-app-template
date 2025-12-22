@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 import { ElDialog, ElInput, ElButton, ElIcon, ElMessageBox, ElEmpty } from 'element-plus';
 import { Search, Delete, Edit, Loading, Clock } from '@element-plus/icons-vue';
 
-import { loadChatSessions, deleteChatSession, updateChatSessionName } from '@/services/tauri/commands';
 import type { ChatSession } from '@/utils/types';
 import { showSuccess, showError } from '@/utils/toast';
-
+import { useChatStore } from '@/stores/chatStore';
+import { useAppStore } from '@/stores/appStore';
 const props = defineProps<{
   modelValue: boolean;
 }>();
@@ -16,14 +17,9 @@ const emit = defineEmits<{
   (e: 'load-session', session: ChatSession): void;
 }>();
 
-type RawChatSession = ChatSession &
-  Partial<{
-    created_at: string;
-    updated_at: string;
-    message_count: number;
-    first_message_preview: string;
-    codeagent_session_id: string;
-  }>;
+const chatStore = useChatStore();
+const appStore = useAppStore();
+const { sessions, isSessionsLoading } = storeToRefs(chatStore);
 
 const TIMESTAMP_FRACTION_REGEX = /\.(\d{3})\d+/;
 
@@ -47,25 +43,8 @@ function formatTimestamp(
   return date.toLocaleString('zh-CN', options);
 }
 
-function normalizeSession(session: RawChatSession): ChatSession {
-  return {
-    ...session,
-    createdAt: session.createdAt || session.created_at || '',
-    updatedAt: session.updatedAt || session.updated_at || '',
-    codeagentSessionId: session.codeagentSessionId || session.codeagent_session_id || undefined,
-    messageCount:
-      session.messageCount ??
-      session.message_count ??
-      session.messages?.length ??
-      0,
-    firstMessagePreview: session.firstMessagePreview || session.first_message_preview || '',
-  };
-}
-
 // 状态
 const searchQuery = ref('');
-const sessions = ref<ChatSession[]>([]);
-const loading = ref(false);
 const selectedSession = ref<ChatSession | null>(null);
 const editingSessionId = ref<string | null>(null);
 const editingName = ref('');
@@ -84,16 +63,12 @@ const filteredSessions = computed(() => {
 
 // 方法
 async function loadSessions() {
-  loading.value = true;
   try {
-    const result = await loadChatSessions(50); // 默认加载50个
-    sessions.value = result.map((session) => normalizeSession(session as RawChatSession));
-    console.log(`Loaded ${result.length} chat sessions`);
+    await chatStore.fetchSessions(appStore.getCurrentWorkspace.id);
+    console.log(`Loaded ${sessions.value.length} chat sessions`);
   } catch (error) {
     console.error('Failed to load chat sessions:', error);
     showError('加载会话历史失败');
-  } finally {
-    loading.value = false;
   }
 }
 
@@ -101,28 +76,9 @@ function selectSession(session: ChatSession) {
   selectedSession.value = session;
 }
 
-// function formatDate(dateStr: string): string {
-//   try {
-//     const date = new Date(dateStr);
-//     const now = new Date();
-//     const diffMs = now.getTime() - date.getTime();
-//     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-//     if (diffDays === 0) {
-//       return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-//     } else if (diffDays === 1) {
-//       return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
-//     } else if (diffDays < 7) {
-//       return `${diffDays}天前`;
-//     } else {
-//       return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
-//     }
-//   } catch {
-//     return dateStr;
-//   }
-// }
-
 function loadSession(session: ChatSession) {
+  appStore.setCurrentSessionId(session.id);
+  chatStore.loadSessionFromHistory(session);
   emit('load-session', session);
   emit('update:modelValue', false);
   showSuccess('会话已加载');
@@ -132,14 +88,13 @@ async function deleteSession(session: ChatSession, event: Event) {
   event.stopPropagation();
 
   try {
-    await ElMessageBox.confirm(`确定要删除会话"${session.name || '未命名会话'}"吗？`, '确认删除', {
+    await ElMessageBox.confirm(`确定要删除会话 "${session.name || '未命名会话'}" 吗？`, '确认删除', {
       confirmButtonText: '删除',
       cancelButtonText: '取消',
       type: 'warning',
     });
 
-    await deleteChatSession(session.id);
-    sessions.value = sessions.value.filter((s) => s.id !== session.id);
+    await chatStore.removeSession(session.id);
 
     if (selectedSession.value?.id === session.id) {
       selectedSession.value = null;
@@ -167,13 +122,7 @@ async function saveSessionName(session: ChatSession) {
   }
 
   try {
-    const updated = normalizeSession(
-      (await updateChatSessionName(session.id, editingName.value.trim())) as RawChatSession
-    );
-    const index = sessions.value.findIndex((s) => s.id === session.id);
-    if (index !== -1) {
-      sessions.value[index] = updated;
-    }
+    const updated = await chatStore.renameSession(session.id, editingName.value.trim());
     if (selectedSession.value?.id === session.id) {
       selectedSession.value = updated;
     }
@@ -227,7 +176,7 @@ watch(
     <div class="flex h-[500px] border border-border rounded">
       <!-- 左侧：会话列表 -->
       <div class="w-2/5 border-r border-border overflow-auto">
-        <div v-if="loading" class="flex items-center justify-center h-full text-text-secondary">
+        <div v-if="isSessionsLoading" class="flex items-center justify-center h-full text-text-secondary">
           <ElIcon :size="32" class="animate-spin">
             <Loading />
           </ElIcon>
@@ -319,7 +268,8 @@ watch(
             </div>
             <div class="text-xs text-text-secondary">
               创建于 {{ formatTimestamp(selectedSession.createdAt) }} · 更新于
-              {{ formatTimestamp(selectedSession.updatedAt) }} · {{ selectedSession.messageCount }} 条消息
+              {{ formatTimestamp(selectedSession.updatedAt) }} ·
+              {{ selectedSession.messageCount }} 条消息
             </div>
           </div>
 
@@ -340,14 +290,10 @@ watch(
                 </div>
                 <div class="mt-1 text-[11px] opacity-70 text-right">
                   {{
-                    formatTimestamp(
-                      msg.timestamp,
-                      'time',
-                      {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      }
-                    )
+                    formatTimestamp(msg.timestamp, 'time', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
                   }}
                 </div>
               </div>

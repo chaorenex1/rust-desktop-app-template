@@ -19,7 +19,7 @@ impl WorkspaceRepository {
         Ok(workspace)
     }
 
-    // get current active workspace\
+    // get current active workspace
     pub async fn get_active(db: &DatabaseConnection) -> AppResult<Option<WorkspaceModel>> {
         let workspace = Workspace::find()
             .filter(workspace::Column::IsActive.eq(true))
@@ -88,6 +88,24 @@ impl WorkspaceRepository {
 
         if let Some(workspace) = workspace {
             workspace.delete(db)
+                .await
+                .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        }
+
+        Ok(())
+    }
+
+    /// set session id for workspace
+    pub async fn set_session_id(db: &DatabaseConnection, id: &i32, session_id: &str) -> AppResult<()> {
+        let workspace = Workspace::find_by_id(*id)
+            .one(db)
+            .await
+            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+        if let Some(workspace) = workspace {
+            let mut active_model: workspace::ActiveModel = workspace.into();
+            active_model.current_session_id = Set(Some(session_id.to_string()));
+            active_model.update(db)
                 .await
                 .map_err(|e| AppError::DatabaseError(e.to_string()))?;
         }

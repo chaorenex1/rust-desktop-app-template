@@ -1,7 +1,7 @@
 //! Tauri commands for chat session management
 
 use crate::services::chat_session::{self, ChatMessage, ChatSession};
-use tracing::{info, error};
+use tracing::{debug, error};
 
 /// Save a chat session
 #[tauri::command]
@@ -11,7 +11,7 @@ pub async fn save_chat_session(
     codeagent_session_id: Option<String>,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatSession, String> {
-    info!(
+    debug!(
         "Command: save_chat_session - session_id: {:?}, name: {:?}, message_count: {}",
         session_id,
         name,
@@ -20,7 +20,7 @@ pub async fn save_chat_session(
 
     match chat_session::save_session(session_id, name, codeagent_session_id, messages) {
         Ok(session) => {
-            info!("Successfully saved chat session: {}", session.id);
+            debug!("Successfully saved chat session: {}", session.id);
             Ok(session)
         }
         Err(e) => {
@@ -32,12 +32,12 @@ pub async fn save_chat_session(
 
 /// Load all chat sessions
 #[tauri::command]
-pub async fn load_chat_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>, String> {
-    info!("Command: load_chat_sessions - limit: {:?}", limit);
+pub async fn load_chat_sessions(workspace_id: String, limit: Option<usize>) -> Result<Vec<ChatSession>, String> {
+    debug!("Command: load_chat_sessions - workspace_id: {}, limit: {:?}", workspace_id, limit);
 
-    match chat_session::load_all_sessions(limit) {
+    match chat_session::load_all_sessions(workspace_id, limit) {
         Ok(sessions) => {
-            info!("Successfully loaded {} chat sessions", sessions.len());
+            debug!("Successfully loaded {} chat sessions", sessions.len());
             Ok(sessions)
         }
         Err(e) => {
@@ -50,11 +50,11 @@ pub async fn load_chat_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>
 /// Delete a chat session
 #[tauri::command]
 pub async fn delete_chat_session(session_id: String) -> Result<(), String> {
-    info!("Command: delete_chat_session - session_id: {}", session_id);
+    debug!("Command: delete_chat_session - session_id: {}", session_id);
 
     match chat_session::delete_session(&session_id) {
         Ok(()) => {
-            info!("Successfully deleted chat session: {}", session_id);
+            debug!("Successfully deleted chat session: {}", session_id);
             Ok(())
         }
         Err(e) => {
@@ -70,14 +70,14 @@ pub async fn update_chat_session_name(
     session_id: String,
     name: String,
 ) -> Result<ChatSession, String> {
-    info!(
+    debug!(
         "Command: update_chat_session_name - session_id: {}, name: {}",
         session_id, name
     );
 
     match chat_session::update_session_name(&session_id, name) {
         Ok(session) => {
-            info!("Successfully updated chat session name: {}", session_id);
+            debug!("Successfully updated chat session name: {}", session_id);
             Ok(session)
         }
         Err(e) => {

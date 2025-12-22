@@ -15,6 +15,7 @@ export type EventType =
   | 'terminal:session:ended'
   | 'chat:message:received'
   | 'chat:message:sent'
+  | 'ai-response'
   | 'settings:updated'
   | 'workspace:changed'
   | 'app:error'
@@ -49,6 +50,7 @@ class EventService {
       'terminal:session:ended',
       'chat:message:received',
       'chat:message:sent',
+      'ai-response',
       'settings:updated',
       'workspace:changed',
       'app:error',
@@ -168,6 +170,10 @@ class EventService {
 
   onChatMessageSent(handler: EventHandler<ChatMessage>): () => void {
     return this.subscribe('chat:message:sent', handler);
+  }
+
+  onAiResponse(handler: EventHandler<any>): () => void {
+    return this.subscribe('ai-response', handler);
   }
 
   // Settings events

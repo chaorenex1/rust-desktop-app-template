@@ -1,22 +1,24 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useAppStore, useThemeStore } from '@/stores';
+import { useAppStore, useThemeStore, useChatStore } from '@/stores';
 import { ErrorContainer } from '@/components/error';
 import { setToastContainer, showSuccess, showError } from '@/utils/toast';
 import { initLightweightModeMonitor } from '@/services/tauri/lightweightMode';
+import { initTauriEventListeners } from '@/services/tauri/eventListeners';
 
 const appStore = useAppStore();
 const themeStore = useThemeStore();
+const chatStore = useChatStore();
 const isLoading = ref(true);
 const toastContainerRef = ref<InstanceType<typeof ErrorContainer> | null>(null);
 let disposeLightweightMode: null | (() => void) = null;
+let disposeTauriEvents: null | (() => void) = null;
 
 onMounted(async () => {
   // 初始化 toast 容器
   if (toastContainerRef.value) {
     setToastContainer(toastContainerRef.value);
   }
-
   try {
     // Initialize application
     await appStore.initialize();
@@ -26,8 +28,10 @@ onMounted(async () => {
     // Lightweight mode (minimized/hidden throttling)
     disposeLightweightMode = await initLightweightModeMonitor(appStore);
 
-    // Listen to Tauri events
-    // await setupEventListeners();
+    disposeTauriEvents = await initTauriEventListeners({
+      appStore,
+      chatStore,
+    });
 
     showSuccess('Code AI Assistant 已准备就绪', '应用启动成功');
   } catch (error) {
@@ -42,74 +46,10 @@ onMounted(async () => {
 onUnmounted(() => {
   disposeLightweightMode?.();
   disposeLightweightMode = null;
+  disposeTauriEvents?.();
+  disposeTauriEvents = null;
 });
 
-// async function setupEventListeners() {
-//   // Listen for file change events
-//   const unlistenFileChanged = await listen('file-changed', (event) => {
-//     console.log('File changed:', event.payload);
-//     // Handle file change event
-//   });
-
-//   // Listen for terminal output events
-//   const unlistenTerminalOutput = await listen('terminal-output', (event) => {
-//     console.log('Terminal output:', event.payload);
-//     // Handle terminal output event
-//   });
-
-//   // Listen for AI response events
-//   const unlistenAiResponse = await listen('ai-response', (event) => {
-//     console.log('AI response:', event.payload);
-//     // Handle AI response event
-//   });
-
-//   // Listen for log message events
-//   const unlistenLogMessage = await listen('log-message', (event) => {
-//     console.log('Log message:', event.payload);
-//     // Handle log message event
-//   });
-
-//   // Listen for workspace changed events
-//   const unlistenWorkspaceChanged = await listen('workspace-changed', (event) => {
-//     console.log('Workspace changed:', event.payload);
-//     appStore.setCurrentWorkspace(event.payload.workspace);
-//   });
-
-//   // Listen for settings updated events
-//   const unlistenSettingsUpdated = await listen('settings-updated', () => {
-//     console.log('Settings updated');
-//     appStore.loadSettings();
-//   });
-
-//   // Listen for app ready events
-//   const unlistenAppReady = await listen('app-ready', () => {
-//     console.log('App ready');
-//   });
-
-//   // Listen for error events
-//   const unlistenError = await listen('error', (event) => {
-//     console.error('Error event:', event.payload);
-//     ElNotification({
-//       title: '错误',
-//       message: event.payload.error,
-//       type: 'error',
-//       duration: 5000,
-//     });
-//   });
-
-//   // Store unlisten functions for cleanup
-//   appStore.setUnlistenFunctions([
-//     unlistenFileChanged,
-//     unlistenTerminalOutput,
-//     unlistenAiResponse,
-//     unlistenLogMessage,
-//     unlistenWorkspaceChanged,
-//     unlistenSettingsUpdated,
-//     unlistenAppReady,
-//     unlistenError,
-//   ]);
-// }
-//
 </script>
 
 <template>

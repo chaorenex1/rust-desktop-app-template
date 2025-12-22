@@ -11,34 +11,30 @@ import {
   ElIcon,
   ElMessageBox,
 } from 'element-plus';
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { listen } from '@tauri-apps/api/event';
+import { ref, computed, nextTick, watch } from 'vue';
+import { storeToRefs } from 'pinia';
 
-import { useFileStore, useAppStore } from '@/stores';
-import { sendChatMessageStreaming, saveChatSession } from '@/services/tauri/commands';
-import type { ChatMessage as ChatMessageType, ChatSession } from '@/utils/types';
-import ChatHistoryDialog from './ChatHistoryDialog.vue';
+import { useFileStore, useAppStore, useChatStore } from '@/stores';
+import ChatHistoryDialog from '@/components/chat/ChatHistoryDialog.vue';
+import { normalizePath } from '@/utils/pathUtils';
 
 const appStore = useAppStore();
 const fileStore = useFileStore();
+const chatStore = useChatStore();
+const { messages, associatedFiles, isStreaming } = storeToRefs(chatStore);
 
 const message = ref('');
-const isLoading = ref(false);
-const associatedFiles = ref<string[]>([]);
-const messages = ref<ChatMessageType[]>([]);
 const messagesContainer = ref<HTMLElement | null>(null);
-const currentRequestId = ref<string | null>(null);
-let aiUnlisten: (() => void) | null = null;
 
 // 历史记录相关
 const showHistoryDialog = ref(false);
-const currentSessionId = ref<string | null>(null);
 
 // 关联文件弹窗
 const showAssociateDialog = ref(false);
 const associateSearch = ref('');
 const recentFiles = ref<string[]>([]);
 const selectedPaths = ref<string[]>([]);
+// const currentSessionId = computed(() => chatStore.currentSessionId || '');
 
 function getFileName(path: string): string {
   const parts = path.split(/[/\\]/);
@@ -74,147 +70,46 @@ const filteredRecentFiles = computed(() => {
   return files.filter((f) => f.name.toLowerCase().includes(q) || f.path.toLowerCase().includes(q));
 });
 
-interface AiResponseEventPayload {
-  request_id: string;
-  delta: string;
-  done: boolean;
-  codeagent_session_id?: string | null;
+function scrollMessagesToBottom() {
+  void nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+    }
+  });
 }
 
-async function setupAiResponseListener() {
-  try {
-    aiUnlisten = await listen<string>('ai-response', (event) => {
-      try {
-        const raw = event.payload;
-        const data: AiResponseEventPayload =
-          typeof raw === 'string' ? JSON.parse(raw) : (raw as any);
-
-        if (!currentRequestId.value || data.request_id !== currentRequestId.value) return;
-
-        const last = messages.value[messages.value.length - 1];
-        if (!last || last.id !== data.request_id || last.role !== 'assistant') return;
-
-        last.content += data.delta;
-
-        // 流式追加内容后，自动滚动到底部
-        void nextTick(() => {
-          if (messagesContainer.value) {
-            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-          }
-        });
-
-        if (data.done) {
-          isLoading.value = false;
-          currentRequestId.value = null;
-
-          // 统一会话 id：优先使用 codeagent-wrapper 的 session id
-          if (data.codeagent_session_id) {
-            currentSessionId.value = data.codeagent_session_id;
-          }
-
-          // AI 完成后保存（包含最新的 codeagent session id）
-          void autoSaveChatSession();
-        }
-      } catch (err) {
-        console.error('Failed to handle ai-response event:', err);
-      }
-    });
-  } catch (error) {
-    console.error('Failed to listen ai-response events:', error);
-  }
-}
-
-onMounted(() => {
-  setupAiResponseListener();
-});
-
-onBeforeUnmount(() => {
-  if (aiUnlisten) {
-    aiUnlisten();
-    aiUnlisten = null;
-  }
-});
-
-// 自动保存会话
-async function autoSaveChatSession() {
-  if (messages.value.length === 0) {
-    return;
-  }
-
-  try {
-    const session = await saveChatSession(
-      currentSessionId.value,
-      null, // 不自动生成名称，由用户手动命名
-      messages.value,
-      currentSessionId.value
-    );
-    currentSessionId.value = session.id;
-    // 统一后 session.id 就是 resume id
-    console.log('Chat session auto-saved:', session.id);
-  } catch (error) {
-    console.error('Failed to auto-save chat session:', error);
-  }
-}
+watch(
+  messages,
+  () => {
+    scrollMessagesToBottom();
+  },
+  { deep: true }
+);
 
 // Send message
 async function sendMessage() {
-  if (!message.value.trim() || isLoading.value) {
+  if (!message.value.trim() || isStreaming.value) {
     return;
   }
 
   const content = message.value.trim();
-  const timestamp = new Date().toISOString();
   const contextFiles = [...associatedFiles.value];
-  const model = appStore.currentAiModel;
-
-  // 先推送用户消息到本地列表
-  messages.value.push({
-    id: `${Date.now()}-user`,
-    role: 'user',
-    content,
-    timestamp,
-    files: contextFiles,
-    model,
-  });
 
   try {
-    isLoading.value = true;
-    // 调用后端流式 AI 命令，返回本次会话的 requestId
-    const requestId = await sendChatMessageStreaming(
+    await chatStore.sendMessage({
       content,
-      contextFiles,
-      appStore.currentCodeCli,
-      currentSessionId.value || undefined,
-      appStore.currentAiModel
-    );
-    currentRequestId.value = requestId;
-
-    // 先插入一个空内容的 assistant 气泡，后续通过事件流式填充
-    messages.value.push({
-      id: requestId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
       files: contextFiles,
-      model,
+      codeCli: appStore.currentCodeCli,
+      workspaceId: appStore.getCurrentWorkspace.id,
+      workspaceDir: normalizePath(appStore.getCurrentWorkspace.path),
+      resumeSessionId: '',
+      model: appStore.currentAiModel,
     });
-
-    // Clear message
     message.value = '';
-
-    // 自动保存由 ai-response done 触发
+    scrollMessagesToBottom();
   } catch (error) {
     console.error('Failed to send message:', error);
-  } finally {
-    // 结束状态由流式事件在 done 时重置
   }
-}
-
-// Load history session
-function loadHistorySession(session: ChatSession) {
-  messages.value = session.messages;
-  currentSessionId.value = session.id;
-  associatedFiles.value = []; // 清空关联文件（历史会话中已包含文件信息）
 }
 
 // Clear chat
@@ -225,8 +120,7 @@ function clearChat() {
     type: 'warning',
   })
     .then(() => {
-      messages.value = [];
-      currentSessionId.value = null; // 清空当前会话ID
+      chatStore.clearChat();
     })
     .catch(() => {
       // 用户取消
@@ -235,7 +129,7 @@ function clearChat() {
 
 // Remove associated file
 function removeAssociatedFile(index: number) {
-  associatedFiles.value.splice(index, 1);
+  chatStore.removeAssociatedFile(index);
 }
 
 // Handle key press
@@ -269,7 +163,7 @@ function isSelected(path: string) {
 }
 
 function confirmAssociate() {
-  associatedFiles.value = [...selectedPaths.value];
+  chatStore.setAssociatedFiles([...selectedPaths.value]);
   // 更新最近关联文件列表（去重并按时间倒序）
   for (const p of selectedPaths.value) {
     const idx = recentFiles.value.indexOf(p);
@@ -330,7 +224,7 @@ function confirmAssociate() {
               {{ msg.content }}
             </div>
 
-            <!-- 关联文件展示，便于 AI 编程场景查看上下文 -->
+            <!-- 关联文件展示，方便 AI 编程场景查看上下文 -->
             <div
               v-if="msg.files && msg.files.length"
               class="mt-2 flex flex-wrap gap-1 text-[11px] opacity-80"
@@ -342,7 +236,7 @@ function confirmAssociate() {
                 class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 cursor-default max-w-[180px] truncate"
                 :title="file"
               >
-                {{ file.split(/[/\\\\]/).pop() }}
+                {{ file.split(/[/\\]/).pop() }}
               </span>
             </div>
 
@@ -420,13 +314,13 @@ function confirmAssociate() {
           v-model="message"
           type="textarea"
           :rows="3"
-          placeholder="请输入消息... (支持 Markdown)"
+          placeholder="请输入消息… (支持 Markdown)"
           resize="none"
           class="flex-1"
           @keydown="handleKeyPress"
         />
 
-        <ElButton type="primary" :icon="Setting" :loading="isLoading" @click="sendMessage">
+        <ElButton type="primary" :icon="Setting" :loading="isStreaming" @click="sendMessage">
           发送
         </ElButton>
       </div>
@@ -539,10 +433,7 @@ function confirmAssociate() {
   </ElDialog>
 
   <!-- 聊天历史对话框 -->
-  <ChatHistoryDialog
-    v-model="showHistoryDialog"
-    @load-session="loadHistorySession"
-  />
+  <ChatHistoryDialog v-model="showHistoryDialog" />
 </template>
 
 <style scoped>

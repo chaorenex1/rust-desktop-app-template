@@ -5,6 +5,7 @@ export interface Workspace {
   id: string;
   name: string;
   path: string;
+  currentSessionId: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -187,8 +188,20 @@ export interface FileContent {
   size: number;
 }
 
+export interface SendMessageOptions {
+  content: string;
+  files: string[];
+  codeCli: string;
+  resumeSessionId?: string | '';
+  workspaceId: string;
+  workspaceDir?: string;
+  model?: string;
+}
+
 export interface ChatMessage {
   id: string;
+  sessionId: string;
+  workspaceId: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
@@ -208,12 +221,22 @@ export interface ChatResponse {
 export interface ChatSession {
   id: string;
   name?: string;
-  codeagentSessionId?: string;
+  sessionId?: string;
+  workspaceId: string;
   messages: ChatMessage[];
   createdAt: string;
   updatedAt: string;
   messageCount: number;
   firstMessagePreview: string;
+}
+
+export interface AiResponseEventPayload {
+  request_id: string;
+  delta: string;
+  done: boolean;
+  session_id?: string | null;
+  workspace_id?: string | null;
+  timestamp: string;
 }
 
 // Terminal types

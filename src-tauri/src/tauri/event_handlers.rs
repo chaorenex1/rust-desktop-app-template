@@ -3,34 +3,34 @@
 //! This module defines Tauri event handlers.
 
 use tauri::{AppHandle, Emitter, Listener};
-use tracing::info;
+use tracing::debug;
 
 use crate::utils::error::{AppError, AppResult};
 
 /// Register event handlers
 pub fn register_event_handlers(app: &mut tauri::App) -> AppResult<()> {
-    info!("Registering event handlers...");
+    debug!("Registering event handlers...");
 
     // Set up event listeners
     let app_handle = app.handle();
     
     app_handle.listen("file-changed", |event| {
-        info!("File changed event: {:?}", event.payload());
+        debug!("File changed event: {:?}", event.payload());
     });
 
     app_handle.listen("terminal-output", |event| {
-        info!("Terminal output event: {:?}", event.payload());
+        debug!("Terminal output event: {:?}", event.payload());
     });
 
     app_handle.listen("ai-response", |event| {
-        info!("AI response event: {:?}", event.payload());
+        debug!("AI response event: {:?}", event.payload());
     });
 
     app_handle.listen("log-message", |event| {
-        info!("Log message event: {:?}", event.payload());
+        debug!("Log message event: {:?}", event.payload());
     });
 
-    info!("Event handlers registered successfully");
+    debug!("Event handlers registered successfully");
     Ok(())
 }
 
@@ -64,13 +64,15 @@ pub fn emit_ai_response(
     request_id: &str,
     delta: &str,
     done: bool,
-    codeagent_session_id: Option<&str>,
+    session_id: Option<&str>,
+    workspace_id: Option<&str>,
 ) -> AppResult<()> {
     let payload = serde_json::json!({
         "request_id": request_id,
         "delta": delta,
         "done": done,
-        "codeagent_session_id": codeagent_session_id,
+        "session_id": session_id,
+        "workspace_id": workspace_id,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
 
