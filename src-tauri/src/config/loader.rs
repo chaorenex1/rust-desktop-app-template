@@ -1,7 +1,7 @@
 //! Configuration loader module
 //!
 //! This module handles loading and managing application configuration.
-
+use std::path::PathBuf;
 use crate::utils::error::{AppError, AppResult};
 use crate::config::schema::AppConfig;
 
@@ -30,9 +30,11 @@ pub fn load_settings() -> AppResult<AppConfig> {
         .add_source(ConfigFile::with_name("config.toml").required(false))
         .add_source(Environment::with_prefix(".env"))
         .build()?;    // Step 2: 反序列化为 AppConfig（自动合并覆盖）
-    let config: AppConfig = cfg.try_deserialize()
+    let mut config: AppConfig = cfg.try_deserialize()
         .map_err(|e| AppError::ConfigError(format!("Failed to deserialize config: {}", e)))?;
-    // Step 3: 返回最终配置
+    // Step 3: 环境变量
+    config.env_vars = load_env_from_file().unwrap_or_default();
+    // Step 4: 返回最终配置
     Ok(config)
 }
 
@@ -45,10 +47,7 @@ pub fn load_config() -> AppResult<AppConfig> {
 
 /// Load configuration from file
 fn load_config_from_file() -> AppResult<AppConfig> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| AppError::ConfigError("Failed to get config directory".to_string()))?
-        .join("code-ai-assistant");
-
+    let config_dir = PathBuf::from(get_default_data_dir()?);
     let config_file = config_dir.join("config.toml");
 
     if !config_file.exists() {
@@ -66,10 +65,7 @@ fn load_config_from_file() -> AppResult<AppConfig> {
 
 /// Save configuration to file
 pub fn save_config(config: &AppConfig) -> AppResult<()> {
-    let config_dir = dirs::config_dir()
-        .ok_or_else(|| AppError::ConfigError("Failed to get config directory".to_string()))?
-        .join("code-ai-assistant");
-
+    let config_dir = PathBuf::from(get_default_data_dir()?);
     // Create config directory if it doesn't exist
     std::fs::create_dir_all(&config_dir)
         .map_err(|e| AppError::ConfigError(format!("Failed to create config directory: {}", e)))?;
@@ -83,4 +79,32 @@ pub fn save_config(config: &AppConfig) -> AppResult<()> {
 
     tracing::info!("Configuration saved successfully to: {:?}", config_file);
     Ok(())
+}
+
+/// Load Environment Variables from file
+pub fn load_env_from_file() -> AppResult<Vec<(String, String)>> {
+    let config_dir = PathBuf::from(get_default_data_dir()?);
+
+    let env_file = config_dir.join(".env");
+
+    if !env_file.exists() {
+        return Err(AppError::ConfigError("Environment file not found".to_string()));
+    }
+
+    let env_str = std::fs::read_to_string(&env_file)
+        .map_err(|e| AppError::ConfigError(format!("Failed to read environment file: {}", e)))?;
+
+    /// 转成 key=value 格式
+    let env_vars: Vec<(String, String)> = env_str.lines()
+        .filter(|line| !line.is_empty() && !line.starts_with('#'))
+        .map(|line| {
+            let mut parts = line.split('=');
+            let key = parts.next().unwrap().trim().to_string();
+            let value = parts.next().unwrap().trim().to_string();
+            (key, value)
+        })
+        .collect();
+
+    tracing::info!("Environment variables loaded successfully from: {:?}", env_file);
+    Ok(env_vars)
 }

@@ -101,15 +101,19 @@ export async function sendChatMessageStreaming(
   message: string,
   contextFiles?: string[],
   codeCli?: string,
-  resumeSessionId?: string,
-  codexModel?: string
+  codexModel?: string,
+  sessionId?: string,
+  workspaceId?: string,
+  workspaceDir?: string
 ): Promise<string> {
   return invoke('send_chat_message_streaming', {
     message,
     contextFiles,
     codeCli,
-    resumeSessionId,
     codexModel,
+    sessionId,
+    workspaceId,
+    workspaceDir,
   });
 }
 
@@ -355,8 +359,8 @@ export async function saveChatSession(
   });
 }
 
-export async function loadChatSessions(limit?: number): Promise<ChatSession[]> {
-  return invoke('load_chat_sessions', { limit });
+export async function loadChatSessions(workspaceId: string, limit?: number): Promise<ChatSession[]> {
+  return invoke('load_chat_sessions', { workspaceId, limit });
 }
 
 export async function deleteChatSession(sessionId: string): Promise<void> {

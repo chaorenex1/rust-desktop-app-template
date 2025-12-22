@@ -5,11 +5,12 @@
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
-use tauri::{AppHandle, State};
-use tracing::{error, info};
+use tauri::{AppHandle, Manager, State};
+use tracing::{error, info, debug};
 use tauri::async_runtime;
 use crate::core::AppState;
 use crate::services::ai::{AiChatOptions, AiService};
+use crate::services::chat_session::{self, ChatSession, ChatMessage};
 use super::event_handlers::emit_ai_response;
 
 /// Send chat message to AI
@@ -18,7 +19,7 @@ pub async fn send_chat_message(
     message: String,
     context_files: Option<Vec<String>>,
 ) -> Result<String, String> {
-    info!("Sending chat message: {}", message);
+    debug!("Sending chat message: {}", message);
 
     // Use AiService as the single entry; internally it calls codeagent-wrapper.
     let ai = AiService::new();
@@ -34,25 +35,44 @@ pub async fn send_chat_message_streaming(
     message: String,
     context_files: Option<Vec<String>>,
     code_cli: Option<String>,
-    resume_session_id: Option<String>,
     codex_model: Option<String>,
+    session_id: Option<String>,
+    workspace_id: Option<String>,
+    workspace_dir: Option<String>,
 ) -> Result<String, String> {
-    info!("Sending chat message (streaming): {}", message);
-    info!(
+    debug!("Sending chat message (streaming): {}", message);
+    debug!(
         code_cli = ?code_cli,
-        resume_session_id = ?resume_session_id,
+        session_id = ?session_id,
         codex_model = ?codex_model,
         "Streaming chat options"
     );
+    // let db = crate::database::connection::get_db_connection(&app_handle)
+    //     .await
+    //     .map_err(|e| e.to_string())?;
+    
+    // let workspace_id_parsed = workspace_id
+    //     .as_ref()
+    //     .and_then(|id| id.parse::<i32>().ok())
+    //     .ok_or_else(|| "Invalid workspace_id".to_string())?;
+    
+    // let workspace = crate::database::repositories::workspace_repository::WorkspaceRepository::get_by_id(&db, &workspace_id_parsed)
+    //     .await
+    //     .map_err(|e| e.to_string())?
+    //     .ok_or_else(|| "Workspace not found".to_string())?;
 
     // 为本次会话生成唯一 request_id，前端用它关联流式回复
+    let config = crate::core::app::get_config(app_handle.state::<AppState>());
+    let app_handle_clone = app_handle.clone();
     let request_id = uuid::Uuid::new_v4().to_string();
     let request_id_for_task = request_id.clone();
-    let app_handle_clone = app_handle.clone();
 
     // 将实际消息处理与流式发送放到后台任务中，避免阻塞当前命令
     let msg = message.clone();
     let ctx_files = context_files.clone();
+    let msg_for_spawn = msg.clone();
+
+    let workspace_id_for_append = workspace_id.clone();
 
     async_runtime::spawn(async move {
         let ai = AiService::new();
@@ -62,17 +82,21 @@ pub async fn send_chat_message_streaming(
                 ctx_files,
                 AiChatOptions {
                     code_cli,
-                    resume_session_id,
+                    resume_session_id: session_id,
                     parallel: false,
                     codex_model,
+                    workspace_dir,
+                    env: config.env_vars.clone(),
                 },
             )
             .await
-        {
+        {   
             Ok(result) => {
+                debug!("AI response: {}", result.message);
                 let chars: Vec<char> = result.message.chars().collect();
                 let total = chars.len();
                 let mut buffer = String::new();
+                let mut full_response = String::new();
 
                 for (idx, ch) in chars.into_iter().enumerate() {
                     buffer.push(ch);
@@ -84,17 +108,19 @@ pub async fn send_chat_message_streaming(
                         buffer.clear();
 
                         let codeagent_session_id = if is_last {
-                            result.codeagent_session_id.as_deref()
+                            result.codeagent_session_id.clone()
                         } else {
                             None
                         };
+                        full_response.push_str(&delta);
 
                         if let Err(e) = emit_ai_response(
-                            &app_handle_clone,
+                            &app_handle,
                             &request_id_for_task,
                             &delta,
                             is_last,
-                            codeagent_session_id,
+                            codeagent_session_id.as_deref(),
+                            workspace_id_for_append.as_deref(),
                         ) {
                             error!("Failed to emit AI response chunk: {:?}", e);
                             break;
@@ -104,15 +130,48 @@ pub async fn send_chat_message_streaming(
                         std::thread::sleep(Duration::from_millis(60));
                     }
                 }
+
+                if let Some(session_id) = result.codeagent_session_id.clone() {
+                    let user_message = ChatMessage {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        role: "user".to_string(),
+                        content: msg_for_spawn.clone(),
+                        timestamp: chrono::Local::now().to_rfc3339().to_string(),
+                        files: None,
+                        session_id: Some(session_id.clone()),
+                        workspace_id: workspace_id_for_append.clone(),
+                        model: None,
+                    };
+                    let assistant_message = ChatMessage {
+                        id: request_id_for_task.clone(),
+                        role: "assistant".to_string(),
+                        content: full_response,
+                        timestamp: chrono::Local::now().to_rfc3339(),
+                        files: None,
+                        session_id: Some(session_id.clone()),
+                        workspace_id: workspace_id_for_append.clone(),
+                        model: None,
+                    };
+                    if let Err(e) = chat_session::append_message_to_session(
+                        &session_id,
+                        vec![user_message, assistant_message],
+                    ) {
+                        error!(
+                            "Failed to append chat messages to session {}: {}",
+                            session_id, e
+                        );
+                    }
+                }
             }
             Err(e) => {
                 error!("Failed to build AI response for streaming: {}", e);
                 let _ = emit_ai_response(
-                    &app_handle_clone,
+                    &app_handle,
                     &request_id_for_task,
                     &format!("[AI 错误] {}", e),
                     true,
                     None,
+                    workspace_id_for_append.as_deref(),
                 );
             }
         }

@@ -6,7 +6,7 @@ import { normalizePath, getDirectoryName } from '@/utils/pathUtils';
 import {
   getSettings,
   saveSettings as saveSettingsCommand,
-  getCurrentWorkspace,
+  getCurrentWorkspace as getCurrentWorkspaceCommand,
   getWorkspaces,
   deleteWorkspace as deleteWorkspaceCommand,
   createWorkspace as createWorkspaceCommand,
@@ -82,15 +82,17 @@ export const useAppStore = defineStore('app', () => {
   const currentShell = ref<string>(settings.value.userPreferences.currentShell || '');
   const currentAiModel = ref<string>(settings.value.userPreferences.currentModel || '');
   const currentCodeCli = ref<string>(settings.value.userPreferences.currentCodeCli || '');
-  const currentWorkspace = ref<Workspace>({
+  const defaultWorkspace = ref<Workspace>({
     id: '',
     name: '',
     path: '',
+    currentSessionId: '',
     isActive: false,
     createdAt: '',
     updatedAt: '',
     settings: {},
   });
+  const currentWorkspace = ref<Workspace>(defaultWorkspace.value);
   const isConnected = ref(false);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
@@ -104,6 +106,7 @@ export const useAppStore = defineStore('app', () => {
   const fontSizeStyle = computed(() => `${settings.value.editor.fontSize}px`);
   const availableAiModels = computed(() => settings.value.ai.model_list);
   const availableCodeClis = computed(() => settings.value.ai.code_cli);
+  const getCurrentWorkspace = computed(() => currentWorkspace.value);
   // Actions
   async function initialize() {
     isLoading.value = true;
@@ -132,11 +135,12 @@ export const useAppStore = defineStore('app', () => {
 
       // Load workspaces
       try {
-        const backendCurrentWorkspaceData = await getCurrentWorkspace();
-        currentWorkspace.value = {
-          ...currentWorkspace.value,
-          ...backendCurrentWorkspaceData,
-        };
+        // const backendCurrentWorkspaceData = await getCurrentWorkspaceCommand();
+        // currentWorkspace.value = {
+        //   ...currentWorkspace.value,
+        //   ...backendCurrentWorkspaceData,
+        // };
+        // currentSessionId.value = currentWorkspace.value.currentSessionId || '';
         const backendWorkspaceList = await getWorkspaces();
         workspaces.value = backendWorkspaceList || [];
       } catch (err) {
@@ -229,9 +233,9 @@ export const useAppStore = defineStore('app', () => {
       workspaces.value = workspaces.value.filter((w) => w.id !== workspaceId);
 
       if (currentWorkspace.value.id === workspaceId) {
-        currentWorkspace.value = {
-          ...currentWorkspace.value,
-        };
+        currentWorkspace.value= {
+          ...defaultWorkspace.value,
+        }
       }
       saveToStorage();
     } catch (err) {
@@ -258,6 +262,14 @@ export const useAppStore = defineStore('app', () => {
     saveToStorage();
   }
 
+  function setCurrentSessionId(sessionId: string) {
+    currentWorkspace.value = {
+      ...currentWorkspace.value,
+      currentSessionId: sessionId,
+    };
+    saveToStorage();
+  }
+
   async function resetToDefaults() {
     settings.value = defaultSettings.value;
     saveToStorage();
@@ -280,6 +292,7 @@ export const useAppStore = defineStore('app', () => {
     localStorage.setItem('currentAiModel', JSON.stringify(currentAiModel.value));
     localStorage.setItem('currentCodeCli', JSON.stringify(currentCodeCli.value));
     localStorage.setItem('currentShell', JSON.stringify(currentShell.value));
+    localStorage.setItem('currentSessionId', JSON.stringify(currentWorkspace.value.currentSessionId));
   };
 
   // const loadFromStorage = () => {
@@ -328,6 +341,7 @@ export const useAppStore = defineStore('app', () => {
     fontSizeStyle,
     availableAiModels,
     availableCodeClis,
+    getCurrentWorkspace,
 
     // Actions
     initialize,
@@ -341,5 +355,6 @@ export const useAppStore = defineStore('app', () => {
     setCurrentShell,
     resetToDefaults,
     setLightweightMode,
+    setCurrentSessionId,
   };
 });

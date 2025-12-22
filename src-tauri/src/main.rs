@@ -85,7 +85,6 @@ fn main() {
             tauri_module::chat_session_commands::delete_chat_session,
             tauri_module::chat_session_commands::update_chat_session_name,
             tauri_module::notification_commands::show_system_notification,
-            tauri_module::codeagent_commands::execute_codeagent_wrapper,
         ])
 
         // Setup application state

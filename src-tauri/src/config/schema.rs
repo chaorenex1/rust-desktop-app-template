@@ -16,6 +16,8 @@ pub struct AppConfig {
     pub deployment: DeploymentSettings,
     /// Logging settings
     pub logging: LoggingSettings,
+    /// Environment variables
+    pub env_vars: Vec<(String, String)>,
 }
 
 /// Application settings
@@ -119,6 +121,7 @@ impl Default for AppConfig {
                     log_file_max_age_days: 30,
                 },
             },
+            env_vars: vec![],
         }
     }
 }

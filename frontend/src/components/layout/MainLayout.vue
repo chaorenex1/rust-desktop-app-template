@@ -27,7 +27,7 @@ const showFileExplorer = ref(true);
 const showBottomPanel = ref(true);
 const sidebarWidth = ref(256);
 // 固定底部面板高度（像素），避免位置随窗口变化上下浮动
-const bottomPanelHeight = 300;
+const bottomPanelHeight = 500;
 
 // Sidebar resize state
 const isResizingSidebar = ref(false);

@@ -5,7 +5,7 @@
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
-use chrono::Utc;
+use chrono::Local;
 use uuid::Uuid;
 use tracing::{info, warn, debug, error};
 
@@ -18,6 +18,8 @@ pub struct ChatMessage {
     pub timestamp: String,
     pub files: Option<Vec<String>>,
     pub model: Option<String>,
+    pub session_id: Option<String>,
+    pub workspace_id: Option<String>,
 }
 
 /// Chat session structure
@@ -26,7 +28,8 @@ pub struct ChatSession {
     pub id: String,
     pub name: Option<String>,
     #[serde(default)]
-    pub codeagent_session_id: Option<String>,
+    pub session_id: Option<String>,
+    pub workspace_id: Option<String>,
     pub messages: Vec<ChatMessage>,
     pub created_at: String,
     pub updated_at: String,
@@ -76,65 +79,60 @@ fn load_session_by_id(session_id: &str) -> Result<ChatSession, String> {
 pub fn save_session(
     session_id: Option<String>,
     name: Option<String>,
-    codeagent_session_id: Option<String>,
+    workspace_id: Option<String>,
     messages: Vec<ChatMessage>,
 ) -> Result<ChatSession, String> {
     let dir = ensure_sessions_dir_exists()?;
 
-    let session_id = session_id.and_then(|s| {
-        let t = s.trim().to_string();
-        if t.is_empty() { None } else { Some(t) }
-    });
-    let codeagent_session_id = codeagent_session_id.and_then(|s| {
-        let t = s.trim().to_string();
-        if t.is_empty() { None } else { Some(t) }
-    });
+    let session_id = session_id.as_deref().ok_or("Session ID is required")?;
+    let file_path = dir.join(format!("{}.json", session_id));
 
-    // 统一 id：优先使用 codeagent_session_id（用于 resume），否则沿用已有 id，再否则生成。
-    let id = codeagent_session_id
-        .clone()
-        .or(session_id.clone())
-        .unwrap_or_else(|| Uuid::new_v4().to_string());
-    let file_path = dir.join(format!("{}.json", id));
-
-    info!("Saving chat session: {} (file: {:?})", id, file_path);
+    info!("Saving chat session: {} (file: {:?})", session_id, file_path);
 
     // Build session object
-    let now = Utc::now().to_rfc3339();
+    let now = Local::now().to_rfc3339();
 
     // Generate first message preview
     let first_message_preview = messages
         .first()
         .map(|m| {
             let content = &m.content;
-            if content.len() > 100 {
-                format!("{}...", &content[..100])
+            let mut chars = content.chars();
+            let preview: String = chars.by_ref().take(100).collect();
+            if chars.next().is_some() {
+                format!("{}...", preview)
             } else {
-                content.clone()
+                preview
             }
         })
         .unwrap_or_default();
 
     // Preserve created_at if updating existing session
-    let (created_at, preserved_codeagent_session_id) = if file_path.exists() {
-        match load_session_by_id(&id) {
-            Ok(existing) => (existing.created_at, existing.codeagent_session_id),
+    let (created_at, preserved_session_id) = if file_path.exists() {
+        match load_session_by_id(&session_id) {
+            Ok(existing) => {
+                let preserved = existing
+                    .session_id
+                    .clone()
+                    .or_else(|| Some(session_id.to_string()));
+                (existing.created_at, preserved)
+            }
             Err(_) => {
                 warn!("Failed to load existing session, using current time as created_at");
-                (now.clone(), None)
+                (now.clone(), Some(session_id.to_string()))
             }
         }
     } else {
-        (now.clone(), None)
+        (now.clone(), Some(session_id.to_string()))
     };
 
     let message_count = messages.len();
 
     let session = ChatSession {
-        id: id.clone(),
+        id: session_id.to_string(),
         name,
-        // 兼容字段：保持与 id 一致，避免“双 id”
-        codeagent_session_id: Some(id.clone()).or(preserved_codeagent_session_id),
+        session_id: preserved_session_id,
+        workspace_id,
         messages,
         created_at,
         updated_at: now,
@@ -149,12 +147,50 @@ pub fn save_session(
     fs::write(&file_path, json)
         .map_err(|e| format!("Failed to write session file: {}", e))?;
 
-    info!("Chat session saved successfully: {}", id);
+    info!("Chat session saved successfully: {}", session_id);
     Ok(session)
 }
 
+/// append a message to a chat session
+pub fn append_message_to_session(session_id: &str, messages: Vec<ChatMessage>) -> Result<(), String> {
+    info!("Appending message to session: {}", session_id);
+
+    let mut session = match load_session_by_id(session_id) {
+        Ok(existing) => existing,
+        Err(err) => {
+            warn!(
+                "Session {} not found when appending messages ({}), creating a new one",
+                session_id, err
+            );
+            let now = Local::now().to_rfc3339();
+            ChatSession {
+                id: session_id.to_string(),
+                name: None,
+                session_id: Some(session_id.clone().to_string()),
+                workspace_id: messages
+                    .first()
+                    .and_then(|msg| msg.workspace_id.clone()),
+                messages: Vec::new(),
+                created_at: now.clone(),
+                updated_at: now,
+                message_count: 0,
+                first_message_preview: String::new(),
+            }
+        }
+    };
+    session.session_id = Some(session_id.clone().to_string());
+    session.messages.extend(messages);
+    session.message_count = session.messages.len();
+    session.updated_at = Local::now().to_rfc3339();
+
+    info!("Session updated with {} total messages", session.message_count);
+
+    save_session(Some(session_id.to_string()), session.name, session.workspace_id, session.messages).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Load all chat sessions
-pub fn load_all_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>, String> {
+pub fn load_all_sessions(workspace_id: String, limit: Option<usize>) -> Result<Vec<ChatSession>, String> {
     let dir = get_sessions_dir()?;
 
     if !dir.exists() {
@@ -167,7 +203,7 @@ pub fn load_all_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>, Strin
     let entries = fs::read_dir(&dir)
         .map_err(|e| format!("Failed to read sessions directory: {}", e))?;
 
-    let mut sessions = Vec::new();
+    let mut sessions: Vec<ChatSession> = Vec::new();
     let mut error_count = 0;
 
     for entry in entries {
@@ -189,29 +225,12 @@ pub fn load_all_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>, Strin
 
         match fs::read_to_string(&path) {
             Ok(content) => match serde_json::from_str::<ChatSession>(&content) {
-                Ok(mut session) => {
-                    // 自动迁移：如果历史里存在 codeagent_session_id 且与 id 不同，尝试将文件重命名为 codeagent_session_id。
-                    if let Some(new_id) = session.codeagent_session_id.clone() {
-                        let new_id = new_id.trim().to_string();
-                        if !new_id.is_empty() && new_id != session.id {
-                            let new_path = dir.join(format!("{}.json", new_id));
-                            if !new_path.exists() {
-                                match fs::rename(&path, &new_path) {
-                                    Ok(()) => {
-                                        session.id = new_id.clone();
-                                        session.codeagent_session_id = Some(new_id);
-                                        if let Ok(json) = serde_json::to_string_pretty(&session) {
-                                            let _ = fs::write(&new_path, json);
-                                        }
-                                        debug!("Migrated session file {:?} -> {:?}", path, new_path);
-                                    }
-                                    Err(e) => {
-                                        warn!("Failed to migrate session file {:?} -> {:?}: {}", path, new_path, e);
-                                    }
-                                }
-                            }
-                        }
+                Ok(session) => {
+                    if session.workspace_id.as_deref() != Some(&workspace_id) {
+                        continue;
                     }
+                    // 自动迁移已禁用：session_id 字段已标准化，不再需要 codeagent_session_id 迁移
+                    // 注：此注释保留以说明数据模型已演变
 
                     debug!("Loaded session: {} from {:?}", session.id, path);
                     sessions.push(session);
@@ -239,9 +258,9 @@ pub fn load_all_sessions(limit: Option<usize>) -> Result<Vec<ChatSession>, Strin
     let result_count = sessions.len();
     if let Some(limit) = limit {
         sessions.truncate(limit);
-        info!("Loaded {} sessions (limited to {} from {})", sessions.len(), limit, result_count);
+        debug!("Loaded {} sessions (limited to {} from {})", sessions.len(), limit, result_count);
     } else {
-        info!("Loaded {} sessions", sessions.len());
+        debug!("Loaded {} sessions", sessions.len());
     }
 
     Ok(sessions)
@@ -256,22 +275,22 @@ pub fn delete_session(session_id: &str) -> Result<(), String> {
         return Err(format!("Session not found: {}", session_id));
     }
 
-    info!("Deleting chat session: {} (file: {:?})", session_id, file_path);
+    debug!("Deleting chat session: {} (file: {:?})", session_id, file_path);
 
     fs::remove_file(&file_path)
         .map_err(|e| format!("Failed to delete session file: {}", e))?;
 
-    info!("Chat session deleted successfully: {}", session_id);
+    debug!("Chat session deleted successfully: {}", session_id);
     Ok(())
 }
 
 /// Update a chat session name
 pub fn update_session_name(session_id: &str, name: String) -> Result<ChatSession, String> {
-    info!("Updating session name: {} -> {}", session_id, name);
+    debug!("Updating session name: {} -> {}", session_id, name);
 
     let mut session = load_session_by_id(session_id)?;
     session.name = Some(name);
-    session.updated_at = Utc::now().to_rfc3339();
+    session.updated_at = Local::now().to_rfc3339();
 
     let dir = get_sessions_dir()?;
     let file_path = dir.join(format!("{}.json", session_id));
@@ -283,39 +302,6 @@ pub fn update_session_name(session_id: &str, name: String) -> Result<ChatSession
     fs::write(&file_path, json)
         .map_err(|e| format!("Failed to write session file: {}", e))?;
 
-    info!("Session name updated successfully: {}", session_id);
+    debug!("Session name updated successfully: {}", session_id);
     Ok(session)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_first_message_preview_truncation() {
-        let long_content = "a".repeat(150);
-        let messages = vec![ChatMessage {
-            id: "test".to_string(),
-            role: "user".to_string(),
-            content: long_content,
-            timestamp: Utc::now().to_rfc3339(),
-            files: None,
-            model: None,
-        }];
-
-        let preview = messages
-            .first()
-            .map(|m| {
-                let content = &m.content;
-                if content.len() > 100 {
-                    format!("{}...", &content[..100])
-                } else {
-                    content.clone()
-                }
-            })
-            .unwrap_or_default();
-
-        assert_eq!(preview.len(), 103); // 100 chars + "..."
-        assert!(preview.ends_with("..."));
-    }
 }

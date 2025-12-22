@@ -15,6 +15,8 @@ pub struct Model {
     pub path: String,
     // active status
     pub is_active: bool,
+    /// Current session id
+    pub current_session_id: Option<String>,
     /// Description of the setting
     pub description: Option<String>,
     /// Created timestamp

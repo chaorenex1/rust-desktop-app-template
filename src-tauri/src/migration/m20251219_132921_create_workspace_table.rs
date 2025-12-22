@@ -33,6 +33,12 @@ impl MigrationTrait for Migration {
                             .unique_key(),
                     )
                     .col(
+                        ColumnDef::new(Workspace::CurrentSessionId)
+                            .string()
+                            .null()
+                            .default(""),
+                    )
+                    .col(
                         ColumnDef::new(Workspace::IsActive)
                             .boolean()
                             .not_null()
@@ -110,6 +116,7 @@ enum Workspace {
     Id,
     Name,
     Path,
+    CurrentSessionId,
     IsActive,
     Description,
     CreatedAt,
