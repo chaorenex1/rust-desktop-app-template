@@ -40,6 +40,7 @@ pub async fn send_chat_message_streaming(
     workspace_id: Option<String>,
     workspace_dir: Option<String>,
     code_cli_changed: Option<bool>,
+    code_cli_task_id: Option<String>,
 ) -> Result<String, String> {
     debug!("Sending chat message (streaming): {}", message);
     debug!(
@@ -47,6 +48,7 @@ pub async fn send_chat_message_streaming(
         session_id = ?session_id,
         codex_model = ?codex_model,
         code_cli_changed = ?code_cli_changed,
+        code_cli_task_id = ?code_cli_task_id,
         "Streaming chat options"
     );
     // let db = crate::database::connection::get_db_connection(&app_handle)
@@ -63,7 +65,9 @@ pub async fn send_chat_message_streaming(
     //     .map_err(|e| e.to_string())?
     //     .ok_or_else(|| "Workspace not found".to_string())?;
 
-    // 为本次会话生成唯一 request_id，前端用它关联流式回复
+    // 生成session_id
+    let session_id = session_id.unwrap_or(uuid::Uuid::new_v4().to_string());
+    debug!("Session ID: {}", session_id);
     let config = crate::core::app::get_config(app_handle.state::<AppState>());
     // let app_handle_clone = app_handle.clone();
     let request_id = uuid::Uuid::new_v4().to_string();
@@ -75,6 +79,12 @@ pub async fn send_chat_message_streaming(
     let msg_for_spawn = msg.clone();
 
     let workspace_id_for_append = workspace_id.clone();
+    let code_cli_for_task = code_cli.clone();
+    let code_cli_for_append = code_cli.clone();
+    let codex_model_for_task = codex_model.clone();
+    let workspace_dir_for_task = workspace_dir.clone();
+    let code_cli_task_id_for_resume = code_cli_task_id.clone();
+    let code_cli_changed_flag = code_cli_changed;
 
     async_runtime::spawn(async move {
         let ai = AiService::new();
@@ -83,12 +93,12 @@ pub async fn send_chat_message_streaming(
                 &msg,
                 ctx_files,
                 AiChatOptions {
-                    code_cli,
-                    resume_session_id: session_id,
+                    code_cli: code_cli_for_task,
+                    resume_session_id: code_cli_task_id_for_resume,
                     parallel: false,
-                    codex_model,
-                    workspace_dir,
-                    code_cli_changed,
+                    codex_model: codex_model_for_task,
+                    workspace_dir: workspace_dir_for_task,
+                    code_cli_changed: code_cli_changed_flag,
                     env: config.env_vars.clone(),
                 },
             )
@@ -122,8 +132,9 @@ pub async fn send_chat_message_streaming(
                             &request_id_for_task,
                             &delta,
                             is_last,
-                            codeagent_session_id.as_deref(),
+                            Some(&session_id),
                             workspace_id_for_append.as_deref(),
+                            codeagent_session_id.as_deref(),
                         ) {
                             error!("Failed to emit AI response chunk: {:?}", e);
                             break;
@@ -133,8 +144,8 @@ pub async fn send_chat_message_streaming(
                         std::thread::sleep(Duration::from_millis(60));
                     }
                 }
-
-                if let Some(session_id) = result.codeagent_session_id.clone() {
+                
+                if let Some(task_id) = result.codeagent_session_id.clone() {
                     let user_message = ChatMessage {
                         id: uuid::Uuid::new_v4().to_string(),
                         role: "user".to_string(),
@@ -158,6 +169,8 @@ pub async fn send_chat_message_streaming(
                     if let Err(e) = chat_session::append_message_to_session(
                         &session_id,
                         vec![user_message, assistant_message],
+                        code_cli_for_append.clone(),
+                        Some(task_id.clone()),
                     ) {
                         error!(
                             "Failed to append chat messages to session {}: {}",
@@ -175,6 +188,7 @@ pub async fn send_chat_message_streaming(
                     true,
                     None,
                     workspace_id_for_append.as_deref(),
+                    None,
                 );
             }
         }

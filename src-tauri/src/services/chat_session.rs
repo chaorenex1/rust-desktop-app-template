@@ -2,6 +2,7 @@
 //!
 //! This module provides functions for managing chat sessions stored as JSON files.
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
@@ -35,6 +36,8 @@ pub struct ChatSession {
     pub updated_at: String,
     pub message_count: usize,
     pub first_message_preview: String,
+    #[serde(default)]
+    pub code_cli_task_ids: HashMap<String, String>,
 }
 
 /// Get the chat sessions directory path
@@ -81,6 +84,7 @@ pub fn save_session(
     name: Option<String>,
     workspace_id: Option<String>,
     messages: Vec<ChatMessage>,
+    code_cli_task_ids: Option<HashMap<String, String>>,
 ) -> Result<ChatSession, String> {
     let dir = ensure_sessions_dir_exists()?;
 
@@ -138,6 +142,7 @@ pub fn save_session(
         updated_at: now,
         message_count,
         first_message_preview,
+        code_cli_task_ids: code_cli_task_ids.unwrap_or_default(),
     };
 
     // Write to file
@@ -152,7 +157,12 @@ pub fn save_session(
 }
 
 /// append a message to a chat session
-pub fn append_message_to_session(session_id: &str, messages: Vec<ChatMessage>) -> Result<(), String> {
+pub fn append_message_to_session(
+    session_id: &str,
+    messages: Vec<ChatMessage>,
+    code_cli: Option<String>,
+    code_cli_task_id: Option<String>,
+) -> Result<(), String> {
     info!("Appending message to session: {}", session_id);
 
     let mut session = match load_session_by_id(session_id) {
@@ -175,6 +185,7 @@ pub fn append_message_to_session(session_id: &str, messages: Vec<ChatMessage>) -
                 updated_at: now,
                 message_count: 0,
                 first_message_preview: String::new(),
+                code_cli_task_ids: HashMap::new(),
             }
         }
     };
@@ -182,10 +193,22 @@ pub fn append_message_to_session(session_id: &str, messages: Vec<ChatMessage>) -
     session.messages.extend(messages);
     session.message_count = session.messages.len();
     session.updated_at = Local::now().to_rfc3339();
+    if let (Some(cli), Some(task_id)) = (code_cli, code_cli_task_id) {
+        session
+            .code_cli_task_ids
+            .insert(cli, task_id);
+    }
 
     info!("Session updated with {} total messages", session.message_count);
 
-    save_session(Some(session_id.to_string()), session.name, session.workspace_id, session.messages).map_err(|e| e.to_string())?;
+    save_session(
+        Some(session_id.to_string()),
+        session.name,
+        session.workspace_id,
+        session.messages,
+        Some(session.code_cli_task_ids.clone()),
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 

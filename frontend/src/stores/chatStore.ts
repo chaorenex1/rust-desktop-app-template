@@ -9,30 +9,6 @@ import {
 } from '@/services/tauri/commands';
 import type { ChatMessage, ChatSession, SendMessageOptions, AiResponseEventPayload } from '@/utils/types';
 
-// type RawChatSession = ChatSession &
-//   Partial<{
-//     created_at: string;
-//     updated_at: string;
-//     message_count: number;
-//     first_message_preview: string;
-//     sessionId: string;
-//   }>;
-
-// function normalizeSession(session: RawChatSession): ChatSession {
-//   return {
-//     ...session,
-//     createdAt: session.createdAt || session.created_at || '',
-//     updatedAt: session.updatedAt || session.updated_at || '',
-//     sessionId: session.sessionId || undefined,
-//     messageCount:
-//       session.messageCount ??
-//       session.message_count ??
-//       session.messages?.length ??
-//       0,
-//     firstMessagePreview: session.firstMessagePreview || session.first_message_preview || '',
-//   };
-// }
-
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([]);
   const associatedFiles = ref<string[]>([]);
@@ -44,6 +20,8 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([]);
   const isSessionsLoading = ref(false);
   const codeCliChanged = ref(false);
+  const codeCliTaskIds = ref<Record<string, string>>({});
+  const pendingCodeCliByRequestId = new Map<string, string>();
 
   function setAssociatedFiles(paths: string[]) {
     associatedFiles.value = [...paths];
@@ -75,12 +53,14 @@ export const useChatStore = defineStore('chat', () => {
     const timestamp = new Date().toISOString();
     const model = options.model;
     const codeCli = options.codeCli;
-    if(currentCodeCli.value){
+    const resumeTaskId = codeCli ? codeCliTaskIds.value[codeCli] : undefined;
+    console.debug('sendMessage', { content, files, model, codeCli, resumeTaskId, codeCliTaskIds, codeCliChanged });
+    if (codeCli) {
+      codeCliChanged.value = !resumeTaskId;
       currentCodeCli.value = codeCli;
-    }else if(codeCli != currentCodeCli.value){
-      codeCliChanged.value = true;
-    }else{
+    } else {
       codeCliChanged.value = false;
+      currentCodeCli.value = '';
     }
 
     messages.value.push({
@@ -96,17 +76,22 @@ export const useChatStore = defineStore('chat', () => {
 
     try {
       isStreaming.value = true;
+      const backendSessionId = currentSessionId.value || null;
       const requestId = await sendChatMessageStreaming(
         content,
         files,
         options.codeCli,
         model,
-        currentSessionId.value || '',
+        backendSessionId,
         options.workspaceId,
         options.workspaceDir,
-        codeCliChanged.value
+        codeCliChanged.value,
+        resumeTaskId || null
       );
       currentRequestId.value = requestId;
+      if (codeCli) {
+        pendingCodeCliByRequestId.set(requestId, codeCli);
+      }
       messages.value.push({
         id: requestId,
         role: 'assistant',
@@ -140,6 +125,16 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (payload.done) {
+      const pendingCodeCli = pendingCodeCliByRequestId.get(payload.request_id);
+      if (pendingCodeCli) {
+        pendingCodeCliByRequestId.delete(payload.request_id);
+        if (payload.code_cli_task_id) {
+          codeCliTaskIds.value = {
+            ...codeCliTaskIds.value,
+            [pendingCodeCli]: payload.code_cli_task_id,
+          };
+        }
+      }
       void finalizeStreaming(payload.session_id || '');
     }
   }
@@ -175,6 +170,8 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = [...session.messages];
     currentSessionId.value = session.id;
     associatedFiles.value = [];
+    codeCliTaskIds.value = { ...(session.codeCliTaskIds || {}) };
+    pendingCodeCliByRequestId.clear();
   }
 
   function clearChat() {
@@ -183,6 +180,8 @@ export const useChatStore = defineStore('chat', () => {
     currentSessionId.value = '';
     currentRequestId.value = '';
     isStreaming.value = false;
+    codeCliTaskIds.value = {};
+    pendingCodeCliByRequestId.clear();
   }
 
   async function fetchSessions(workspaceId: string, limit = 50): Promise<ChatSession[]> {
@@ -201,6 +200,8 @@ export const useChatStore = defineStore('chat', () => {
 
     if (currentSessionId.value === sessionId) {
       currentSessionId.value = '';
+      codeCliTaskIds.value = {};
+      pendingCodeCliByRequestId.clear();
     }
   }
 
@@ -225,6 +226,7 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming,
     sessions,
     isSessionsLoading,
+    codeCliTaskIds,
 
     // Actions
     getCurrentSessionId,
