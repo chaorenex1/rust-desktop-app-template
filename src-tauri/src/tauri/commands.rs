@@ -39,12 +39,14 @@ pub async fn send_chat_message_streaming(
     session_id: Option<String>,
     workspace_id: Option<String>,
     workspace_dir: Option<String>,
+    code_cli_changed: Option<bool>,
 ) -> Result<String, String> {
     debug!("Sending chat message (streaming): {}", message);
     debug!(
         code_cli = ?code_cli,
         session_id = ?session_id,
         codex_model = ?codex_model,
+        code_cli_changed = ?code_cli_changed,
         "Streaming chat options"
     );
     // let db = crate::database::connection::get_db_connection(&app_handle)
@@ -63,7 +65,7 @@ pub async fn send_chat_message_streaming(
 
     // 为本次会话生成唯一 request_id，前端用它关联流式回复
     let config = crate::core::app::get_config(app_handle.state::<AppState>());
-    let app_handle_clone = app_handle.clone();
+    // let app_handle_clone = app_handle.clone();
     let request_id = uuid::Uuid::new_v4().to_string();
     let request_id_for_task = request_id.clone();
 
@@ -86,6 +88,7 @@ pub async fn send_chat_message_streaming(
                     parallel: false,
                     codex_model,
                     workspace_dir,
+                    code_cli_changed,
                     env: config.env_vars.clone(),
                 },
             )

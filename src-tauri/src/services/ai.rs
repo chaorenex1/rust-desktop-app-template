@@ -43,6 +43,8 @@ pub struct AiChatOptions {
     pub codex_model: Option<String>,
     /// Workspace ID (used for context files).
     pub workspace_dir: Option<String>,
+    /// Whether the code CLI has changed (used for session resuming).
+    pub code_cli_changed: Option<bool>,
     /// Environment variables (mapped to CODEAGENT_ENV).
     pub env: Vec<(String, String)>,
 }
@@ -232,6 +234,7 @@ impl AiService {
                 parallel: options.parallel,
                 codex_model: options.codex_model,
                 env: options.env,
+                code_cli_changed: options.code_cli_changed,
             })
             .await?;
 
@@ -387,7 +390,7 @@ impl AiService {
 
         if let Some(resume) = spec.resume_session_id.as_deref() {
                 let resume = resume.trim();
-                if !resume.is_empty() {
+                if !resume.is_empty() && !spec.code_cli_changed.unwrap_or(false) {
                     args.push("resume".to_string());
                     args.push(resume.to_string());
                 }
@@ -548,6 +551,7 @@ struct CodeagentRunSpec {
     parallel: bool,
     codex_model: Option<String>,
     env: Vec<(String, String)>,
+    code_cli_changed: Option<bool>,
     
 }
 

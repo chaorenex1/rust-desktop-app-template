@@ -11,7 +11,7 @@ import {
   ElIcon,
   ElMessageBox,
 } from 'element-plus';
-import { ref, computed, nextTick, watch } from 'vue';
+import { ref, computed, nextTick, watch,onMounted,onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
 
 import { useFileStore, useAppStore, useChatStore } from '@/stores';
@@ -35,6 +35,15 @@ const associateSearch = ref('');
 const recentFiles = ref<string[]>([]);
 const selectedPaths = ref<string[]>([]);
 // const currentSessionId = computed(() => chatStore.currentSessionId || '');
+
+
+onMounted(() => {
+  chatStore.setCurrentCodeCli(appStore.currentCodeCli);
+});
+
+onUnmounted(() => {
+  chatStore.setCurrentCodeCli('');
+});
 
 function getFileName(path: string): string {
   const parts = path.split(/[/\\]/);

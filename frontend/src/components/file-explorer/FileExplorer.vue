@@ -10,14 +10,19 @@ import {
   CopyDocument,
   Monitor,
 } from '@element-plus/icons-vue';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { ElTree, ElInput, ElButton, ElIcon, ElMessageBox } from 'element-plus';
 import { ref, onMounted, watch } from 'vue';
-import { useFileStore } from '@/stores/filesStore';
+import { useRouter } from 'vue-router';
+import { useFileStore,useAppStore,useChatStore } from '@/stores';
 import { showError, showWarning, showSuccess } from '@/utils/toast';
 import type { FileIconConfig } from '@/utils/fileIcons';
 import { getIcon } from '@/utils/fileIcons';
 
+const router = useRouter();
 const fileStore = useFileStore();
+const appStore = useAppStore();
+const chatStore = useChatStore();
 
 const searchQuery = ref('');
 const treeRef = ref<InstanceType<typeof ElTree> | null>(null);
@@ -35,6 +40,7 @@ interface FileNode {
 const treeData = ref<FileNode[]>([]);
 const rootDirectory = ref<FileNode | null>(null);
 const isLoading = ref(false);
+const showDirectoryDialog = ref(false);
 
 const defaultProps = {
   children: 'children',
@@ -209,6 +215,45 @@ async function createNew(path: string, isDirectory = false) {
   }
 }
 
+// Create new workspace
+async function createNewWorkspace() {
+  try {
+    isLoading.value = true;
+    // 使用 Tauri dialog 插件打开目录选择对话框
+    const result = await openDialog({
+      directory: true,
+      multiple: false,
+      title: '选择工作目录',
+    });
+
+    if (result && typeof result === 'string') {
+      // 加载目录
+      await fileStore.loadDirectory(result);
+      fileStore.setRootDirectory(result);
+
+      // 创建工作区
+      await appStore.createWorkspace(result, true);
+      // 清空聊天记录
+      chatStore.clearChat();
+
+      // 关闭对话框
+      showDirectoryDialog.value = false;
+
+      // 跳转到dashboard
+      router.push('/dashboard');
+    } else {
+      // 用户取消了选择
+      showDirectoryDialog.value = false;
+    }
+  } catch (error) {
+    showError('选择目录失败', '选择目录失败');
+    console.error('选择目录失败', error);
+    showDirectoryDialog.value = false;
+  } finally {
+    isLoading.value = false;
+  }
+}
+
 // Refresh directory
 async function refreshDirectory() {
   await initialize();
@@ -358,6 +403,14 @@ async function handleOpenTerminal(data: FileNode) {
             @click="createNew(fileStore.getRootDirectory, true)"
           >
             文件夹
+          </ElButton>
+          <ElButton
+            :icon="Plus"
+            size="small"
+            text
+            @click="createNewWorkspace()"
+          >
+            新工作区
           </ElButton>
         </div>
         <ElButton :icon="Refresh" size="small" text @click="refreshDirectory" />

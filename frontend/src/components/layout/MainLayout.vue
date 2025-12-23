@@ -12,7 +12,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { showError, showSuccess } from '@/utils/toast';
 
-import { useAppStore, useFileStore } from '@/stores';
+import { useAppStore, useFileStore,useChatStore } from '@/stores';
 import MainSidebar from '@/components/layout/MainSidebar.vue';
 import EditorArea from '@/components/layout/EditorArea.vue';
 import BottomTabs from '@/components/layout/BottomTabs.vue';
@@ -20,6 +20,7 @@ import type { Workspace } from '@/utils/types';
 
 const appStore = useAppStore();
 const fileStore = useFileStore();
+const chatStore = useChatStore();
 const router = useRouter();
 
 // Panel visibility & layout
@@ -121,6 +122,8 @@ async function openRecentDirectoryFromHeader(dir: Workspace) {
     await fileStore.loadDirectory(dir.path);
     // 切换工作区
     await appStore.switchWorkspace(dir.id);
+    // 清空聊天记录
+    chatStore.clearChat();
 
     showSuccess(`已切换到工作区: ${dir.name}`);
   } catch (error) {
