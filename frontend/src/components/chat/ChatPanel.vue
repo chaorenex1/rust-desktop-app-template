@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { Link, Delete, Setting, Search, Folder, Document, Clock } from '@element-plus/icons-vue';
+import {
+  Link,
+  Delete,
+  Setting,
+  Search,
+  Folder,
+  Document,
+  Clock,
+  DocumentCopy,
+  Loading,
+} from '@element-plus/icons-vue';
 import {
   ElInput,
   ElButton,
@@ -10,9 +20,15 @@ import {
   ElDialog,
   ElIcon,
   ElMessageBox,
+  ElMessage,
 } from 'element-plus';
-import { ref, computed, nextTick, watch,onMounted,onUnmounted } from 'vue';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { storeToRefs } from 'pinia';
+import { marked } from 'marked';
+
+marked.setOptions({
+  breaks: true,
+});
 
 import { useFileStore, useAppStore, useChatStore } from '@/stores';
 import ChatHistoryDialog from '@/components/chat/ChatHistoryDialog.vue';
@@ -21,10 +37,12 @@ import { normalizePath } from '@/utils/pathUtils';
 const appStore = useAppStore();
 const fileStore = useFileStore();
 const chatStore = useChatStore();
-const { messages, associatedFiles, isStreaming } = storeToRefs(chatStore);
+const { messages, associatedFiles, isStreaming, currentRequestId } = storeToRefs(chatStore);
 
 const message = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
+const isMarkdownMode = ref(true);
+const clipboardImages = ref<string[]>([]);
 
 // 历史记录相关
 const showHistoryDialog = ref(false);
@@ -101,7 +119,14 @@ async function sendMessage() {
     return;
   }
 
-  const content = message.value.trim();
+  const contentSegments = [message.value.trim()];
+  if (clipboardImages.value.length) {
+    const imageMarkdown = clipboardImages.value
+      .map((src, index) => `![Pasted Image ${index + 1}](${src})`)
+      .join('\n\n');
+    contentSegments.push(imageMarkdown);
+  }
+  const content = contentSegments.filter(Boolean).join('\n\n');
   const contextFiles = [...associatedFiles.value];
 
   try {
@@ -115,6 +140,7 @@ async function sendMessage() {
       model: appStore.currentAiModel,
     });
     message.value = '';
+    clipboardImages.value = [];
     scrollMessagesToBottom();
   } catch (error) {
     console.error('Failed to send message:', error);
@@ -184,6 +210,45 @@ function confirmAssociate() {
   }
   showAssociateDialog.value = false;
 }
+
+function renderMarkdown(content: string) {
+  return marked.parse(content || '');
+}
+
+async function copyMessage(content: string) {
+  try {
+    await navigator.clipboard.writeText(content || '');
+    ElMessage.success('消息已复制');
+  } catch (error) {
+    console.error('Failed to copy message:', error);
+    ElMessage.error('复制失败');
+  }
+}
+
+function handleTextareaPaste(event: ClipboardEvent) {
+  const items = event.clipboardData?.items;
+  if (!items?.length) {
+    return;
+  }
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (!file) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          clipboardImages.value.push(reader.result);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+}
+
+function removeClipboardImage(index: number) {
+  clipboardImages.value.splice(index, 1);
+}
 </script>
 
 <template>
@@ -226,11 +291,25 @@ function confirmAssociate() {
           :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
         >
           <div
-            class="max-w-[70%] rounded-lg px-3 py-2 text-sm shadow-sm"
+            class="max-w-[70%] rounded-lg px-3 py-2 text-sm shadow-sm relative"
             :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-surface text-text'"
           >
-            <div class="whitespace-pre-wrap break-words">
-              {{ msg.content }}
+            <div class="flex items-start gap-2">
+              <div class="flex-1 message-content">
+                <div v-if="isMarkdownMode" class="markdown-body" v-html="renderMarkdown(msg.content)" />
+                <div v-else class="whitespace-pre-wrap break-words">
+                  {{ msg.content }}
+                </div>
+              </div>
+              <ElTooltip content="复制消息" placement="top">
+                <ElButton
+                  :icon="DocumentCopy"
+                  size="small"
+                  text
+                  class="shrink-0"
+                  @click="copyMessage(msg.content)"
+                />
+              </ElTooltip>
             </div>
 
             <!-- 关联文件展示，方便 AI 编程场景查看上下文 -->
@@ -247,6 +326,16 @@ function confirmAssociate() {
               >
                 {{ file.split(/[/\\]/).pop() }}
               </span>
+            </div>
+
+            <div
+              v-if="isStreaming && msg.id === currentRequestId"
+              class="mt-2 flex items-center text-xs text-primary/90"
+            >
+              <ElIcon class="mr-1 animate-spin" :size="14">
+                <Loading />
+              </ElIcon>
+              <span>AI 正在生成...</span>
             </div>
 
             <div class="mt-1 text-[11px] opacity-70 text-right">
@@ -302,7 +391,27 @@ function confirmAssociate() {
           </div>
         </div>
 
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-3 flex-wrap justify-end">
+          <div class="flex items-center space-x-1">
+            <span class="text-sm text-text-secondary">渲染:</span>
+            <ElButton
+              size="small"
+              :type="isMarkdownMode ? 'primary' : 'default'"
+              text
+              @click="isMarkdownMode = true"
+            >
+              Markdown
+            </ElButton>
+            <ElButton
+              size="small"
+              :type="!isMarkdownMode ? 'primary' : 'default'"
+              text
+              @click="isMarkdownMode = false"
+            >
+              文本
+            </ElButton>
+          </div>
+
           <ElTooltip content="聊天历史" placement="bottom">
             <ElButton :icon="Clock" size="small" text @click="showHistoryDialog = true" />
           </ElTooltip>
@@ -327,11 +436,30 @@ function confirmAssociate() {
           resize="none"
           class="flex-1"
           @keydown="handleKeyPress"
+          @paste="handleTextareaPaste"
         />
 
         <ElButton type="primary" :icon="Setting" :loading="isStreaming" @click="sendMessage">
           发送
         </ElButton>
+      </div>
+
+      <div v-if="clipboardImages.length" class="mt-2 flex flex-wrap gap-3">
+        <div
+          v-for="(img, index) in clipboardImages"
+          :key="index"
+          class="relative border border-dashed border-primary/40 rounded-lg p-1 bg-surface/60"
+        >
+          <img :src="img" alt="clipboard preview" class="w-20 h-20 object-cover rounded" />
+          <ElButton
+            size="small"
+            text
+            class="absolute top-0 right-0"
+            @click="removeClipboardImage(index)"
+          >
+            移除
+          </ElButton>
+        </div>
       </div>
 
       <!-- Input Hints -->
@@ -455,5 +583,42 @@ function confirmAssociate() {
 
 :deep(.el-select) {
   width: auto;
+}
+
+:deep(.markdown-body) {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+:deep(.markdown-body code) {
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+:deep(.markdown-body pre) {
+  padding: 0.6rem;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+:deep(.markdown-body a) {
+  color: var(--el-color-primary);
+}
+
+.message-content {
+  width: 100%;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

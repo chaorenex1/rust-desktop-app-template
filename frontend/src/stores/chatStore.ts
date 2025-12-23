@@ -15,7 +15,6 @@ export const useChatStore = defineStore('chat', () => {
   const currentSessionId = ref<string>('');
   const currentRequestId = ref<string>('');
   const currentCodeCli = ref<string>('');
-  const associatedClipboardImage = ref<string>('');
   const isStreaming = ref(false);
   const sessions = ref<ChatSession[]>([]);
   const isSessionsLoading = ref(false);
