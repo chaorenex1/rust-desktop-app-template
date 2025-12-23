@@ -1,22 +1,11 @@
 <script setup lang="ts">
 import { Plus, Delete, Edit } from '@element-plus/icons-vue';
-import {
-  ElButton,
-  ElTable,
-  ElTableColumn,
-  ElDialog,
-  ElForm,
-  ElFormItem,
-  ElInput,
-  ElSwitch,
-  ElMessage,
-  ElMessageBox,
-} from 'element-plus';
+import { ElButton, ElTable, ElTableColumn, ElDialog, ElForm, ElFormItem, ElInput, ElSwitch, ElMessageBox } from 'element-plus';
 import { ref, computed } from 'vue';
 import {saveSettings as saveTauriSettings } from '@/services/tauri/commands';
 import { useAppStore } from '@/stores';
 import type { EnvironmentVariable } from '@/utils/types';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showWarning } from '@/utils/toast';
 
 const appStore = useAppStore();
 
@@ -30,11 +19,11 @@ const editingEnvVarIndex = ref<number | null>(null);
 // Environment variable operations
 function addEnvVar() {
   if (!newEnvVar.value.name.trim()) {
-    ElMessage.warning('请输入变量名');
+    showWarning('请输入变量名');
     return;
   }
   if (!newEnvVar.value.value.trim()) {
-    ElMessage.warning('请输入变量值');
+    showWarning('请输入变量值');
     return;
   }
 
@@ -119,7 +108,7 @@ async function saveSettings() {
 //     }
 //   } catch (error) {
 //     console.error('Failed to load environment variables:', error);
-//     ElMessage.warning('加载设置失败，使用默认值');
+//     showWarning('加载设置失败，使用默认值');
 //   }
 // }
 

@@ -6,7 +6,6 @@ import { normalizePath, getDirectoryName } from '@/utils/pathUtils';
 import {
   getSettings,
   saveSettings as saveSettingsCommand,
-  getCurrentWorkspace as getCurrentWorkspaceCommand,
   getWorkspaces,
   deleteWorkspace as deleteWorkspaceCommand,
   createWorkspace as createWorkspaceCommand,

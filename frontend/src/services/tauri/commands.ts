@@ -361,6 +361,7 @@ function normalizeChatMessage(message: BackendChatMessage): ChatMessage {
     timestamp: message.timestamp || '',
     files: message.files || [],
     model: message.model,
+    fileMetadata: message.fileMetadata || message.file_metadata,
   };
 }
 
@@ -410,4 +411,8 @@ export async function deleteChatSession(sessionId: string): Promise<void> {
 export async function updateChatSessionName(sessionId: string, name: string): Promise<ChatSession> {
   const session = await invoke<BackendChatSession>('update_chat_session_name', { sessionId, name });
   return normalizeChatSession(session);
+}
+
+export async function cancelStreamingRequest(requestId: string): Promise<void> {
+  return invoke('cancel_streaming_request', { requestId });
 }

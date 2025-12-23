@@ -1,21 +1,11 @@
 <script setup lang="ts">
 import { Plus, Delete, Edit } from '@element-plus/icons-vue';
-import {
-  ElButton,
-  ElTable,
-  ElTableColumn,
-  ElDialog,
-  ElForm,
-  ElFormItem,
-  ElInput,
-  ElMessage,
-  ElMessageBox
-} from 'element-plus';
+import { ElButton, ElTable, ElTableColumn, ElDialog, ElForm, ElFormItem, ElInput, ElMessageBox } from 'element-plus';
 import { ref,computed } from 'vue';
 import { saveSettings as saveTauriSettings } from '@/services/tauri/commands';
 import { useAppStore } from '@/stores';
 import type { CodeCli } from '@/utils/types';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showWarning } from '@/utils/toast';
 
 const appStore = useAppStore();
 // Code CLIs
@@ -30,23 +20,23 @@ const editingCodeCliIndex = ref<number | null>(null);
 // Code CLI operations
 function addCodeCli() {
   if (!newCodeCli.value.name.trim()) {
-    ElMessage.warning('请输入CLI名称');
+    showWarning('请输入CLI名称');
     return;
   }
   if (!newCodeCli.value.command.trim()) {
-    ElMessage.warning('请输入命令路径');
+    showWarning('请输入命令路径');
     return;
   }
 
   if (editingCodeCliIndex.value !== null) {
     // 编辑模式
     codeClis.value[editingCodeCliIndex.value] = { ...newCodeCli.value };
-    ElMessage.success('Code CLI已更新');
+    showSuccess('Code CLI已更新');
     editingCodeCliIndex.value = null;
   } else {
     // 新增模式
     codeClis.value.push({ ...newCodeCli.value });
-    ElMessage.success('Code CLI已添加');
+    showSuccess('Code CLI已添加');
   }
   newCodeCli.value = { name: '', command: '', args: '' };
   showCodeCliDialog.value = false;
@@ -120,7 +110,7 @@ async function saveSettings() {
 //     }
 //   } catch (error) {
 //     console.error('Failed to load Code CLIs:', error);
-//     ElMessage.warning('加载设置失败，使用默认值');
+//     showWarning('加载设置失败，使用默认值');
 //   }
 // }
 

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { ElButton, ElCard, ElForm, ElFormItem, ElInput, ElMessage } from 'element-plus';
+import { ElButton, ElCard, ElForm, ElFormItem, ElInput } from 'element-plus';
 import { User, Lock } from '@element-plus/icons-vue';
+import { showWarning, showSuccess, showError } from '@/utils/toast';
 
 const router = useRouter();
 
@@ -15,7 +16,7 @@ const isLoading = ref(false);
 
 async function handleLogin() {
   if (!loginForm.value.username || !loginForm.value.password) {
-    ElMessage.warning('请输入用户名和密码');
+    showWarning('请输入用户名和密码');
     return;
   }
 
@@ -24,10 +25,10 @@ async function handleLogin() {
     // TODO: Implement actual login logic
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    ElMessage.success('登录成功');
+    showSuccess('登录成功');
     router.push('/dashboard');
   } catch (error) {
-    ElMessage.error('登录失败');
+    showError('登录失败');
   } finally {
     isLoading.value = false;
   }

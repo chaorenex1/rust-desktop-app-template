@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { Setting, Document, ChatDotRound, Promotion, Folder } from '@element-plus/icons-vue';
-import { ElButton, ElCard, ElDialog, ElMessage } from 'element-plus';
+import { ElButton, ElCard, ElDialog } from 'element-plus';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import type { Workspace } from '@/utils/types';
 import { useFileStore, useAppStore } from '@/stores';
+import { showError } from '@/utils/toast';
 
 const router = useRouter();
 const fileStore = useFileStore();
@@ -65,7 +66,7 @@ async function selectDirectory() {
       showDirectoryDialog.value = false;
     }
   } catch (error) {
-    ElMessage.error('选择目录失败: ' + (error as Error).message);
+    showError('选择目录失败: ' + (error as Error).message);
     console.error('选择目录失败', error);
     showDirectoryDialog.value = false;
   } finally {
@@ -83,7 +84,7 @@ async function openRecentDirectory(dir: Workspace) {
 
     router.push('/dashboard');
   } catch (error) {
-    ElMessage.error('打开目录失败: ' + (error as Error).message);
+    showError('打开目录失败: ' + (error as Error).message);
     console.error('打开目录失败', error);
   }
 }

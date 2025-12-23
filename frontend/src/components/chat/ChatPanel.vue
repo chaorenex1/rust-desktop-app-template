@@ -1,30 +1,52 @@
 <script setup lang="ts">
-import { Link, Delete, Setting, Search, Folder, Document, Clock } from '@element-plus/icons-vue';
 import {
-  ElInput,
-  ElButton,
-  ElSelect,
-  ElOption,
-  ElTooltip,
-  ElTag,
-  ElDialog,
-  ElIcon,
-  ElMessageBox,
-} from 'element-plus';
-import { ref, computed, nextTick, watch,onMounted,onUnmounted } from 'vue';
+  Link,
+  Delete,
+  Setting,
+  Search,
+  Folder,
+  Document,
+  Clock,
+  DocumentCopy,
+  Loading,
+} from '@element-plus/icons-vue';
+import { ElInput, ElButton, ElSelect, ElOption, ElTooltip, ElTag, ElDialog, ElIcon, ElMessageBox } from 'element-plus';
+import { ref, computed, nextTick, watch, onMounted, onUnmounted, reactive } from 'vue';
 import { storeToRefs } from 'pinia';
+import { marked } from 'marked';
+import { convertFileSrc, invoke as tauriInvoke } from '@tauri-apps/api/core';
+
+marked.setOptions({
+  breaks: true,
+});
 
 import { useFileStore, useAppStore, useChatStore } from '@/stores';
 import ChatHistoryDialog from '@/components/chat/ChatHistoryDialog.vue';
 import { normalizePath } from '@/utils/pathUtils';
+import { showSuccess, showError, showWarning } from '@/utils/toast';
 
 const appStore = useAppStore();
 const fileStore = useFileStore();
 const chatStore = useChatStore();
-const { messages, associatedFiles, isStreaming } = storeToRefs(chatStore);
+const { messages, associatedFiles, isStreaming, currentRequestId } = storeToRefs(chatStore);
+
+interface ClipboardImageEntry {
+  filePath: string;
+  fileName: string;
+  width: number;
+  height: number;
+  preview: string;
+}
 
 const message = ref('');
 const messagesContainer = ref<HTMLElement | null>(null);
+const isMarkdownMode = ref(true);
+const clipboardImages = ref<ClipboardImageEntry[]>([]);
+const contextMenu = reactive({
+  visible: false,
+  x: 0,
+  y: 0,
+});
 
 // 历史记录相关
 const showHistoryDialog = ref(false);
@@ -43,6 +65,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   chatStore.setCurrentCodeCli('');
+  closeContextMenu();
 });
 
 function getFileName(path: string): string {
@@ -101,8 +124,14 @@ async function sendMessage() {
     return;
   }
 
+  const clipboardAttachments = clipboardImages.value.map((entry) => ({
+    path: entry.filePath,
+    width: entry.width,
+    height: entry.height,
+    preview: entry.preview,
+  }));
   const content = message.value.trim();
-  const contextFiles = [...associatedFiles.value];
+  const contextFiles = [...associatedFiles.value, ...clipboardAttachments.map((entry) => entry.path)];
 
   try {
     await chatStore.sendMessage({
@@ -113,8 +142,10 @@ async function sendMessage() {
       workspaceDir: normalizePath(appStore.getCurrentWorkspace.path),
       resumeSessionId: '',
       model: appStore.currentAiModel,
+      clipboardAttachments,
     });
     message.value = '';
+    clipboardImages.value = [];
     scrollMessagesToBottom();
   } catch (error) {
     console.error('Failed to send message:', error);
@@ -184,6 +215,120 @@ function confirmAssociate() {
   }
   showAssociateDialog.value = false;
 }
+
+function renderMarkdown(content: string) {
+  return marked.parse(content || '');
+}
+
+async function copyMessage(content: string) {
+  try {
+    await navigator.clipboard.writeText(content || '');
+    showSuccess('消息已复制');
+  } catch (error) {
+    console.error('Failed to copy message:', error);
+    showError('复制失败');
+  }
+}
+
+function removeClipboardImage(index: number) {
+  clipboardImages.value.splice(index, 1);
+}
+
+async function getImageDimensions(blob: Blob): Promise<{ width: number; height: number }> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(blob);
+    img.onload = () => {
+      resolve({ width: img.width, height: img.height });
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      resolve({ width: 0, height: 0 });
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+}
+
+async function persistClipboardBlob(blob: Blob, extensionHint?: string) {
+  const extension = extensionHint || blob.type.split('/')[1] || 'png';
+  const fileName = `codex-clipboard-${Date.now().toString(36)}-${Math.random()
+    .toString(16)
+    .slice(2)}.${extension}`;
+  const arrayBuffer = await blob.arrayBuffer();
+  const bytes = Array.from(new Uint8Array(arrayBuffer));
+  const filePath = await tauriInvoke<string>('save_clipboard_image', {
+    fileName,
+    bytes,
+  });
+  const { width, height } = await getImageDimensions(blob);
+  clipboardImages.value.push({
+    filePath,
+    fileName,
+    width,
+    height,
+    preview: convertFileSrc(filePath),
+  });
+}
+
+function handleTextareaPaste(event: ClipboardEvent) {
+  const items = event.clipboardData?.items;
+  if (!items?.length) {
+    return;
+  }
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (!file) continue;
+      void persistClipboardBlob(file, file.type.split('/')[1]).then(() => {
+        showSuccess('已添加剪贴板图片');
+      });
+    }
+  }
+}
+
+function closeContextMenu() {
+  if (!contextMenu.visible) return;
+  contextMenu.visible = false;
+  document.removeEventListener('click', closeContextMenu);
+}
+
+function handleInputContextMenu(event: MouseEvent) {
+  event.preventDefault();
+  contextMenu.x = event.clientX;
+  contextMenu.y = event.clientY;
+  contextMenu.visible = true;
+  document.addEventListener('click', closeContextMenu);
+}
+
+async function insertClipboardImageFromClipboard() {
+  if (!navigator.clipboard || typeof navigator.clipboard.read !== 'function') {
+    showWarning('当前环境不支持读取剪贴板');
+    closeContextMenu();
+    return;
+  }
+
+  try {
+    const items = await navigator.clipboard.read();
+    for (const item of items) {
+      const type = item.types.find((t) => t.startsWith('image/'));
+      if (!type) {
+        continue;
+      }
+      const blob = await item.getType(type);
+      await persistClipboardBlob(blob, type.split('/')[1]);
+      showSuccess('已插入剪贴板图片');
+      return;
+    }
+    showWarning('剪贴板中没有图片');
+  } catch (error) {
+    console.error('Failed to read clipboard image:', error);
+    showError('读取剪贴板失败');
+  } finally {
+    closeContextMenu();
+  }
+}
 </script>
 
 <template>
@@ -226,27 +371,68 @@ function confirmAssociate() {
           :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"
         >
           <div
-            class="max-w-[70%] rounded-lg px-3 py-2 text-sm shadow-sm"
+            class="message-card max-w-[70%] rounded-lg px-3 py-3 text-sm shadow-sm relative"
             :class="msg.role === 'user' ? 'bg-primary text-white' : 'bg-surface text-text'"
           >
-            <div class="whitespace-pre-wrap break-words">
-              {{ msg.content }}
+            <div class="copy-button">
+              <ElTooltip content="复制消息" placement="top">
+                <ElButton
+                  :icon="DocumentCopy"
+                  size="small"
+                  text
+                  class="copy-trigger"
+                  @click="copyMessage(msg.content)"
+                />
+              </ElTooltip>
             </div>
 
-            <!-- 关联文件展示，方便 AI 编程场景查看上下文 -->
+            <div class="message-content" :class="{ markdown: isMarkdownMode }">
+              <div v-if="isMarkdownMode" class="markdown-body" v-html="renderMarkdown(msg.content)" />
+              <div v-else class="whitespace-pre-wrap break-words">
+                {{ msg.content }}
+              </div>
+            </div>
+
             <div
               v-if="msg.files && msg.files.length"
-              class="mt-2 flex flex-wrap gap-1 text-[11px] opacity-80"
+              class="mt-2 flex flex-wrap gap-2 text-[11px] opacity-90 attachments"
             >
-              <span class="mr-1">关联文件:</span>
-              <span
+              <div
                 v-for="file in msg.files"
                 :key="file"
-                class="px-1 py-0.5 rounded bg-black/10 dark:bg-white/10 cursor-default max-w-[180px] truncate"
-                :title="file"
+                class="attachment-item"
+                :title="getFileName(file)"
               >
-                {{ file.split(/[/\\]/).pop() }}
-              </span>
+                <template v-if="msg.fileMetadata?.[file]">
+                  <img
+                    class="w-14 h-14 object-cover rounded mb-1"
+                    :src="msg.fileMetadata[file]?.preview || convertFileSrc(file)"
+                    alt="附件"
+                  />
+                  <div class="font-medium truncate w-24">{{ getFileName(file) }}</div>
+                  <div class="text-[10px] text-text-secondary/80">
+                    {{ msg.fileMetadata[file]?.width }}×{{ msg.fileMetadata[file]?.height }}
+                  </div>
+                </template>
+                <template v-else>
+                  <span class="px-2 py-1 rounded bg-black/10 dark:bg-white/10 block truncate max-w-[180px]">
+                    {{ getFileName(file) }}
+                  </span>
+                </template>
+              </div>
+            </div>
+
+            <div
+              v-if="isStreaming && msg.id === currentRequestId"
+              class="mt-2 flex items-center justify-between text-xs text-primary/90 status-row"
+            >
+              <div class="flex items-center">
+                <ElIcon class="mr-1 animate-spin" :size="14">
+                  <Loading />
+                </ElIcon>
+                <span>AI 正在生成...</span>
+              </div>
+              <ElButton size="small" text type="danger" @click="chatStore.cancelStreaming()">终止</ElButton>
             </div>
 
             <div class="mt-1 text-[11px] opacity-70 text-right">
@@ -302,7 +488,27 @@ function confirmAssociate() {
           </div>
         </div>
 
-        <div class="flex items-center space-x-2">
+        <div class="flex items-center space-x-3 flex-wrap justify-end">
+          <div class="flex items-center space-x-1">
+            <span class="text-sm text-text-secondary">渲染:</span>
+            <ElButton
+              size="small"
+              :type="isMarkdownMode ? 'primary' : 'default'"
+              text
+              @click="isMarkdownMode = true"
+            >
+              Markdown
+            </ElButton>
+            <ElButton
+              size="small"
+              :type="!isMarkdownMode ? 'primary' : 'default'"
+              text
+              @click="isMarkdownMode = false"
+            >
+              文本
+            </ElButton>
+          </div>
+
           <ElTooltip content="聊天历史" placement="bottom">
             <ElButton :icon="Clock" size="small" text @click="showHistoryDialog = true" />
           </ElTooltip>
@@ -318,7 +524,7 @@ function confirmAssociate() {
       </div>
 
       <!-- Message Input -->
-      <div class="flex items-end space-x-2">
+      <div class="flex items-end space-x-2" @contextmenu="handleInputContextMenu">
         <ElInput
           v-model="message"
           type="textarea"
@@ -327,6 +533,7 @@ function confirmAssociate() {
           resize="none"
           class="flex-1"
           @keydown="handleKeyPress"
+          @paste="handleTextareaPaste"
         />
 
         <ElButton type="primary" :icon="Setting" :loading="isStreaming" @click="sendMessage">
@@ -334,10 +541,25 @@ function confirmAssociate() {
         </ElButton>
       </div>
 
+      <div v-if="clipboardImages.length" class="mt-2 flex flex-wrap gap-3">
+        <div
+          v-for="(img, index) in clipboardImages"
+          :key="index"
+          class="relative border border-dashed border-primary/40 rounded-lg p-2 bg-surface/60 w-28"
+        >
+          <img :src="img.preview" alt="clipboard preview" class="w-full h-20 object-cover rounded mb-1" />
+          <div class="text-xs truncate" :title="img.fileName">{{ img.fileName }}</div>
+          <div class="text-[10px] text-text-secondary/80">{{ img.width }}×{{ img.height }}</div>
+          <ElButton size="small" text class="absolute top-0 right-0" @click="removeClipboardImage(index)">
+            移除
+          </ElButton>
+        </div>
+      </div>
+
       <!-- Input Hints -->
       <div class="mt-2 text-xs text-text-secondary">
         <div class="flex items-center justify-between">
-          <span>按 Enter 发送，Shift+Enter 换行</span>
+          <span>按 Enter 发送，Shift+Enter 换行，右键输入框插入剪贴板图片</span>
           <span>Markdown 预览可用</span>
         </div>
       </div>
@@ -443,6 +665,14 @@ function confirmAssociate() {
 
   <!-- 聊天历史对话框 -->
   <ChatHistoryDialog v-model="showHistoryDialog" />
+
+  <div
+    v-if="contextMenu.visible"
+    class="clipboard-context-menu"
+    :style="{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }"
+  >
+    <button type="button" @click.stop="insertClipboardImageFromClipboard">插入剪贴板图片</button>
+  </div>
 </template>
 
 <style scoped>
@@ -455,5 +685,79 @@ function confirmAssociate() {
 
 :deep(.el-select) {
   width: auto;
+}
+
+:deep(.markdown-body) {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+:deep(.markdown-body code) {
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+}
+
+:deep(.markdown-body pre) {
+  padding: 0.6rem;
+  border-radius: 6px;
+  overflow: auto;
+}
+
+:deep(.markdown-body a) {
+  color: var(--el-color-primary);
+}
+
+.message-card {
+  position: relative;
+}
+
+.copy-button {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.2rem;
+}
+
+.copy-trigger {
+  opacity: 0.7;
+}
+
+.message-content {
+  width: 100%;
+  padding-right: 2.2rem;
+}
+
+.attachments .attachment-item {
+  min-width: 5rem;
+  border-radius: 0.5rem;
+  padding: 0.2rem;
+  background-color: rgba(0, 0, 0, 0.07);
+}
+
+.clipboard-context-menu {
+  position: fixed;
+  background: var(--el-bg-color-overlay);
+  border: 1px solid var(--el-border-color);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.clipboard-context-menu button {
+  font-size: 0.85rem;
+  color: var(--el-color-primary);
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

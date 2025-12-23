@@ -58,6 +58,8 @@ fn main() {
             tauri_module::fs_command::delete_directory,
             tauri_module::commands::send_chat_message,
             tauri_module::commands::send_chat_message_streaming,
+            tauri_module::commands::cancel_streaming_request,
+            tauri_module::commands::save_clipboard_image,
             tauri_module::commands::execute_command,
             tauri_module::commands::execute_terminal_command,
             tauri_module::commands::spawn_terminal,
