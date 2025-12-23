@@ -104,7 +104,8 @@ export async function sendChatMessageStreaming(
   codexModel?: string,
   sessionId?: string,
   workspaceId?: string,
-  workspaceDir?: string
+  workspaceDir?: string,
+  codeCliChanged?: boolean,
 ): Promise<string> {
   return invoke('send_chat_message_streaming', {
     message,
@@ -114,6 +115,7 @@ export async function sendChatMessageStreaming(
     sessionId,
     workspaceId,
     workspaceDir,
+    codeCliChanged,
   });
 }
 

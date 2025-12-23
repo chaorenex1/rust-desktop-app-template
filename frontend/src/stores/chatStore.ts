@@ -3,7 +3,6 @@ import { ref } from 'vue';
 
 import {
   sendChatMessageStreaming,
-  saveChatSession,
   loadChatSessions,
   deleteChatSession,
   updateChatSessionName,
@@ -37,11 +36,14 @@ import type { ChatMessage, ChatSession, SendMessageOptions, AiResponseEventPaylo
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([]);
   const associatedFiles = ref<string[]>([]);
-  const currentSessionId = ref<string | null>(null);
-  const currentRequestId = ref<string | null>(null);
+  const currentSessionId = ref<string>('');
+  const currentRequestId = ref<string>('');
+  const currentCodeCli = ref<string>('');
+  const associatedClipboardImage = ref<string>('');
   const isStreaming = ref(false);
   const sessions = ref<ChatSession[]>([]);
   const isSessionsLoading = ref(false);
+  const codeCliChanged = ref(false);
 
   function setAssociatedFiles(paths: string[]) {
     associatedFiles.value = [...paths];
@@ -55,6 +57,14 @@ export const useChatStore = defineStore('chat', () => {
     return currentSessionId.value;
   }
 
+  function getCurrentCodeCli(): string {
+    return currentCodeCli.value;
+  }
+
+  function setCurrentCodeCli(codeCli: string) {
+    currentCodeCli.value = codeCli;
+  }
+
   async function sendMessage(options: SendMessageOptions): Promise<void> {
     const content = options.content.trim();
     if (!content) {
@@ -64,6 +74,14 @@ export const useChatStore = defineStore('chat', () => {
     const files = [...options.files];
     const timestamp = new Date().toISOString();
     const model = options.model;
+    const codeCli = options.codeCli;
+    if(currentCodeCli.value){
+      currentCodeCli.value = codeCli;
+    }else if(codeCli != currentCodeCli.value){
+      codeCliChanged.value = true;
+    }else{
+      codeCliChanged.value = false;
+    }
 
     messages.value.push({
       id: `${Date.now()}-user`,
@@ -86,6 +104,7 @@ export const useChatStore = defineStore('chat', () => {
         currentSessionId.value || '',
         options.workspaceId,
         options.workspaceDir,
+        codeCliChanged.value
       );
       currentRequestId.value = requestId;
       messages.value.push({
@@ -121,13 +140,13 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     if (payload.done) {
-      void finalizeStreaming(payload.session_id || null);
+      void finalizeStreaming(payload.session_id || '');
     }
   }
 
-  async function finalizeStreaming(newSessionId?: string | null) {
+  async function finalizeStreaming(newSessionId: string) {
     isStreaming.value = false;
-    currentRequestId.value = null;
+    currentRequestId.value = '';
     if (newSessionId) {
       currentSessionId.value = newSessionId as string;
     }
@@ -161,8 +180,8 @@ export const useChatStore = defineStore('chat', () => {
   function clearChat() {
     messages.value = [];
     associatedFiles.value = [];
-    currentSessionId.value = null;
-    currentRequestId.value = null;
+    currentSessionId.value = '';
+    currentRequestId.value = '';
     isStreaming.value = false;
   }
 
@@ -181,7 +200,7 @@ export const useChatStore = defineStore('chat', () => {
     sessions.value = sessions.value.filter((session) => session.id !== sessionId);
 
     if (currentSessionId.value === sessionId) {
-      currentSessionId.value = null;
+      currentSessionId.value = '';
     }
   }
 
@@ -209,6 +228,8 @@ export const useChatStore = defineStore('chat', () => {
 
     // Actions
     getCurrentSessionId,
+    getCurrentCodeCli,
+    setCurrentCodeCli,
     setAssociatedFiles,
     removeAssociatedFile,
     sendMessage,
