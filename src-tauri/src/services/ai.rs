@@ -10,7 +10,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 use tracing::{debug, info, warn};
 
-use crate::database::models::workspace;
 use crate::utils::error::{AppError, AppResult};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

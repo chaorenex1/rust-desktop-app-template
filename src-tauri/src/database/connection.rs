@@ -3,7 +3,7 @@
 //! This module handles database connections and connection pooling.
 
 use std::sync::Arc;
-use tauri::{App, AppHandle, Manager, State};
+use tauri::{App, AppHandle, Manager};
 use tracing::{error, info};
 
 use sea_orm::{ConnectOptions, Database, DatabaseConnection};

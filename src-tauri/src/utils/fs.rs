@@ -1,4 +1,3 @@
-use anyhow::Context;
 
 pub fn init_dir(dir: &str) -> Result<(), std::io::Error> {
     let data_dir = std::path::Path::new(dir);

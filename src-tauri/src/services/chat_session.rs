@@ -166,7 +166,7 @@ pub fn append_message_to_session(session_id: &str, messages: Vec<ChatMessage>) -
             ChatSession {
                 id: session_id.to_string(),
                 name: None,
-                session_id: Some(session_id.clone().to_string()),
+                session_id: Some(session_id.to_string()),
                 workspace_id: messages
                     .first()
                     .and_then(|msg| msg.workspace_id.clone()),
@@ -178,7 +178,7 @@ pub fn append_message_to_session(session_id: &str, messages: Vec<ChatMessage>) -
             }
         }
     };
-    session.session_id = Some(session_id.clone().to_string());
+    session.session_id = Some(session_id.to_string());
     session.messages.extend(messages);
     session.message_count = session.messages.len();
     session.updated_at = Local::now().to_rfc3339();
