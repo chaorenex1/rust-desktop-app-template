@@ -94,7 +94,6 @@ pub fn load_env_from_file() -> AppResult<Vec<(String, String)>> {
     let env_str = std::fs::read_to_string(&env_file)
         .map_err(|e| AppError::ConfigError(format!("Failed to read environment file: {}", e)))?;
 
-    /// 转成 key=value 格式
     let env_vars: Vec<(String, String)> = env_str.lines()
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
         .map(|line| {
