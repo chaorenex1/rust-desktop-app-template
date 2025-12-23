@@ -21,6 +21,7 @@ self.MonacoEnvironment = {
     if (label === 'typescript' || label === 'javascript') {
       return new tsWorker();
     }
+    console.debug(`[Monaco] getWorker: ${label}`);
     return new editorWorker();
   },
 };

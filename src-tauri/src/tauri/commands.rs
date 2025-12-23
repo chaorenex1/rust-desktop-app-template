@@ -5,12 +5,13 @@
 use std::fs;
 use std::path::PathBuf;
 use std::time::Duration;
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager, State};
 use tracing::{error, info, debug};
 use tauri::async_runtime;
 use crate::core::AppState;
 use crate::services::ai::{AiChatOptions, AiService};
-use crate::services::chat_session::{self, ChatSession, ChatMessage};
+use crate::services::chat_session::{self, ChatMessage};
 use super::event_handlers::emit_ai_response;
 
 /// Send chat message to AI
@@ -86,7 +87,9 @@ pub async fn send_chat_message_streaming(
     let code_cli_task_id_for_resume = code_cli_task_id.clone();
     let code_cli_changed_flag = code_cli_changed;
 
-    async_runtime::spawn(async move {
+    let app_handle_for_task = app_handle.clone();
+    let request_id_for_spawn = request_id_for_task.clone();
+    let join_handle = async_runtime::spawn(async move {
         let ai = AiService::new();
         match ai
             .send_message_with_options(
@@ -128,8 +131,8 @@ pub async fn send_chat_message_streaming(
                         full_response.push_str(&delta);
 
                         if let Err(e) = emit_ai_response(
-                            &app_handle,
-                            &request_id_for_task,
+                            &app_handle_for_task,
+                            &request_id_for_spawn,
                             &delta,
                             is_last,
                             Some(&session_id),
@@ -157,7 +160,7 @@ pub async fn send_chat_message_streaming(
                         model: None,
                     };
                     let assistant_message = ChatMessage {
-                        id: request_id_for_task.clone(),
+                        id: request_id_for_spawn.clone(),
                         role: "assistant".to_string(),
                         content: full_response,
                         timestamp: chrono::Local::now().to_rfc3339(),
@@ -182,8 +185,8 @@ pub async fn send_chat_message_streaming(
             Err(e) => {
                 error!("Failed to build AI response for streaming: {}", e);
                 let _ = emit_ai_response(
-                    &app_handle,
-                    &request_id_for_task,
+                    &app_handle_for_task,
+                    &request_id_for_spawn,
                     &format!("[AI 错误] {}", e),
                     true,
                     None,
@@ -194,8 +197,84 @@ pub async fn send_chat_message_streaming(
         }
     });
 
+    let handle_entry = Arc::new(Mutex::new(Some(join_handle)));
+    {
+        let state = app_handle.state::<AppState>();
+        state
+            .streaming_tasks
+            .lock()
+            .unwrap()
+            .insert(request_id_for_task.clone(), handle_entry.clone());
+    }
+
+    let cleanup_handle = app_handle.clone();
+    let request_id_for_cleanup = request_id_for_task.clone();
+    async_runtime::spawn(async move {
+        if let Some(handle) = {
+            let mut guard = handle_entry.lock().unwrap();
+            guard.take()
+        } {
+            let _ = handle.await;
+        }
+        let app_state = cleanup_handle.state::<AppState>();
+        let mut tasks = app_state.streaming_tasks.lock().unwrap();
+        tasks.remove(&request_id_for_cleanup);
+    });
+
     // 立即把 request_id 返回给前端，前端可用它在 Chat Messages Area 中关联消息
     Ok(request_id)
+}
+
+/// Save clipboard image to a temporary file and return its absolute path
+#[tauri::command]
+pub async fn save_clipboard_image(
+    app_handle: AppHandle,
+    file_name: Option<String>,
+    bytes: Vec<u8>,
+) -> Result<String, String> {
+    if bytes.is_empty() {
+        return Err("Clipboard image data is empty".to_string());
+    }
+
+    let mut dir = app_handle
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("Failed to resolve cache directory: {}", e))?;
+    dir.push("clipboard-images");
+
+    if let Err(err) = fs::create_dir_all(&dir) {
+        return Err(format!("Failed to prepare clipboard directory: {}", err));
+    }
+
+    let generated_name = format!("codex-clipboard-{}.png", uuid::Uuid::new_v4());
+    let final_name = file_name.unwrap_or(generated_name);
+    let file_path = dir.join(final_name);
+
+    fs::write(&file_path, bytes).map_err(|e| format!("Failed to write clipboard image: {}", e))?;
+
+    Ok(file_path.to_string_lossy().to_string())
+}
+
+/// Cancel an in-flight streaming request by request_id
+#[tauri::command]
+pub async fn cancel_streaming_request(
+    app_handle: AppHandle,
+    request_id: String,
+) -> Result<(), String> {
+    let handle_entry = {
+        let state = app_handle.state::<AppState>();
+        let mut tasks = state.streaming_tasks.lock().unwrap();
+        tasks.remove(&request_id)
+    };
+
+    if let Some(handle_entry) = handle_entry {
+        if let Some(handle) = handle_entry.lock().unwrap().take() {
+            handle.abort();
+        }
+        Ok(())
+    } else {
+        Err("Streaming request not found or already finished".to_string())
+    }
 }
 
 /// Execute command in terminal

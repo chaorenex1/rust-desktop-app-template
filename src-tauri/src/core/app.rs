@@ -2,7 +2,9 @@
 //!
 //! This module contains the core application logic and state management.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+use tauri::async_runtime::JoinHandle;
 use tauri::{App, AppHandle, Manager, State};
 
 use crate::utils::error::AppResult;
@@ -20,6 +22,8 @@ pub struct AppState {
     pub db_pool: Arc<crate::database::connection::DatabasePool>,
     /// Terminal service for managing terminal sessions
     pub terminal: TerminalService,
+    /// Active streaming tasks for cancellation
+    pub streaming_tasks: Mutex<HashMap<String, Arc<Mutex<Option<JoinHandle<()>>>>>>,
 }
 
 impl AppState {
@@ -34,6 +38,7 @@ impl AppState {
             config: Mutex::new(config),
             db_pool,
             terminal: TerminalService::new(),
+            streaming_tasks: Mutex::new(HashMap::new()),
         }
     }
 }

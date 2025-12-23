@@ -1,21 +1,11 @@
 <script setup lang="ts">
 import { Plus, Delete, Edit } from '@element-plus/icons-vue';
-import {
-  ElButton,
-  ElTable,
-  ElTableColumn,
-  ElDialog,
-  ElForm,
-  ElFormItem,
-  ElInput,
-  ElMessage,
-  ElMessageBox,
-} from 'element-plus';
+import { ElButton, ElTable, ElTableColumn, ElDialog, ElForm, ElFormItem, ElInput, ElMessageBox } from 'element-plus';
 import { ref, computed } from 'vue';
 import { saveSettings as saveTauriSettings } from '@/services/tauri/commands';
 import { useAppStore } from '@/stores';
 import type { AIModel } from '@/utils/types';
-import { showSuccess, showError } from '@/utils/toast';
+import { showSuccess, showError, showWarning } from '@/utils/toast';
 
 const appStore = useAppStore();
 // AI models
@@ -28,11 +18,11 @@ const editingAiModelIndex = ref<number | null>(null);
 // AI model operations
 function addAiModel() {
   if (!newAiModel.value.name.trim()) {
-    ElMessage.warning('请输入模型名称');
+    showWarning('请输入模型名称');
     return;
   }
   if (!newAiModel.value.endpoint.trim()) {
-    ElMessage.warning('请输入API端点');
+    showWarning('请输入API端点');
     return;
   }
 
@@ -51,11 +41,11 @@ function addAiModel() {
   } else {
     // 新增模式
     if (!newAiModel.value.apiKey) {
-      ElMessage.warning('请输入API密钥');
+      showWarning('请输入API密钥');
       return;
     }
     aiModels.value.push({ ...newAiModel.value });
-    ElMessage.success('模型已添加');
+    showSuccess('模型已添加');
   }
   newAiModel.value = { name: '', endpoint: '', apiKey: '', provider: '', id: '' };
   showAiModelDialog.value = false;
@@ -133,7 +123,7 @@ async function saveSettings() {
 //     }
 //   } catch (error) {
 //     console.error('Failed to load AI models:', error);
-//     ElMessage.warning('加载设置失败，使用默认值');
+//     showWarning('加载设置失败，使用默认值');
 //   }
 // }
 

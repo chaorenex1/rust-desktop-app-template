@@ -6,8 +6,16 @@ import {
   loadChatSessions,
   deleteChatSession,
   updateChatSessionName,
+  cancelStreamingRequest,
 } from '@/services/tauri/commands';
-import type { ChatMessage, ChatSession, SendMessageOptions, AiResponseEventPayload } from '@/utils/types';
+import type {
+  ChatMessage,
+  ChatSession,
+  SendMessageOptions,
+  AiResponseEventPayload,
+  ClipboardAttachment,
+  FileMetadata,
+} from '@/utils/types';
 
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<ChatMessage[]>([]);
@@ -21,6 +29,7 @@ export const useChatStore = defineStore('chat', () => {
   const codeCliChanged = ref(false);
   const codeCliTaskIds = ref<Record<string, string>>({});
   const pendingCodeCliByRequestId = new Map<string, string>();
+  const pendingUserMessageId = ref<string>('');
 
   function setAssociatedFiles(paths: string[]) {
     associatedFiles.value = [...paths];
@@ -48,7 +57,20 @@ export const useChatStore = defineStore('chat', () => {
       return;
     }
 
-    const files = [...options.files];
+    const clipboardAttachments = options.clipboardAttachments ?? [];
+    const files = [...options.files, ...clipboardAttachments.map((attachment) => attachment.path)];
+    const fileMetadataMap = clipboardAttachments.reduce<Record<string, FileMetadata>>(
+      (acc, attachment) => {
+        acc[attachment.path] = {
+          width: attachment.width,
+          height: attachment.height,
+          preview: attachment.preview,
+        };
+        return acc;
+      },
+      {}
+    );
+    const fileMetadata = Object.keys(fileMetadataMap).length ? fileMetadataMap : undefined;
     const timestamp = new Date().toISOString();
     const model = options.model;
     const codeCli = options.codeCli;
@@ -62,8 +84,9 @@ export const useChatStore = defineStore('chat', () => {
       currentCodeCli.value = '';
     }
 
+    const userMessageId = `${Date.now()}-user`;
     messages.value.push({
-      id: `${Date.now()}-user`,
+      id: userMessageId,
       role: 'user',
       content,
       timestamp,
@@ -71,7 +94,9 @@ export const useChatStore = defineStore('chat', () => {
       model,
       sessionId: currentSessionId.value || '',
       workspaceId: options.workspaceId,
+      fileMetadata,
     });
+    pendingUserMessageId.value = userMessageId;
 
     try {
       isStreaming.value = true;
@@ -141,6 +166,7 @@ export const useChatStore = defineStore('chat', () => {
   async function finalizeStreaming(newSessionId: string) {
     isStreaming.value = false;
     currentRequestId.value = '';
+    pendingUserMessageId.value = '';
     if (newSessionId) {
       currentSessionId.value = newSessionId as string;
     }
@@ -171,6 +197,7 @@ export const useChatStore = defineStore('chat', () => {
     associatedFiles.value = [];
     codeCliTaskIds.value = { ...(session.codeCliTaskIds || {}) };
     pendingCodeCliByRequestId.clear();
+    pendingUserMessageId.value = '';
   }
 
   function clearChat() {
@@ -181,6 +208,7 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming.value = false;
     codeCliTaskIds.value = {};
     pendingCodeCliByRequestId.clear();
+    pendingUserMessageId.value = '';
   }
 
   async function fetchSessions(workspaceId: string, limit = 50): Promise<ChatSession[]> {
@@ -201,6 +229,7 @@ export const useChatStore = defineStore('chat', () => {
       currentSessionId.value = '';
       codeCliTaskIds.value = {};
       pendingCodeCliByRequestId.clear();
+      pendingUserMessageId.value = '';
     }
   }
 
@@ -214,6 +243,41 @@ export const useChatStore = defineStore('chat', () => {
       currentSessionId.value = updated.id;
     }
     return updated;
+  }
+
+  async function cancelStreaming(): Promise<void> {
+    if (!currentRequestId.value) {
+      return;
+    }
+    try {
+      await cancelStreamingRequest(currentRequestId.value);
+    } catch (error) {
+      console.warn('Failed to cancel streaming:', error);
+    } finally {
+      rollbackStreaming();
+    }
+  }
+
+  function rollbackStreaming() {
+    if (!currentRequestId.value) {
+      return;
+    }
+
+    const assistantIndex = messages.value.findIndex((msg) => msg.id === currentRequestId.value);
+    if (assistantIndex !== -1) {
+      messages.value.splice(assistantIndex, 1);
+    }
+
+    if (pendingUserMessageId.value) {
+      const userIndex = messages.value.findIndex((msg) => msg.id === pendingUserMessageId.value);
+      if (userIndex !== -1) {
+        messages.value.splice(userIndex, 1);
+      }
+    }
+
+    isStreaming.value = false;
+    currentRequestId.value = '';
+    pendingUserMessageId.value = '';
   }
 
   return {
@@ -240,5 +304,6 @@ export const useChatStore = defineStore('chat', () => {
     fetchSessions,
     removeSession,
     renameSession,
+    cancelStreaming,
   };
 });

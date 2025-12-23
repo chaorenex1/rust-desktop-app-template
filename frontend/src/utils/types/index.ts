@@ -196,6 +196,7 @@ export interface SendMessageOptions {
   workspaceId: string;
   workspaceDir?: string;
   model?: string;
+  clipboardAttachments?: ClipboardAttachment[];
 }
 
 export interface ChatMessage {
@@ -207,6 +208,7 @@ export interface ChatMessage {
   timestamp: string;
   files?: string[];
   model?: string;
+  fileMetadata?: Record<string, FileMetadata>;
 }
 
 export interface ChatResponse {
@@ -216,6 +218,19 @@ export interface ChatResponse {
     completionTokens: number;
     totalTokens: number;
   };
+}
+
+export interface ClipboardAttachment {
+  path: string;
+  width: number;
+  height: number;
+  preview?: string;
+}
+
+export interface FileMetadata {
+  width: number;
+  height: number;
+  preview?: string;
 }
 
 export interface ChatSession {
@@ -245,6 +260,7 @@ export type BackendChatMessage = Partial<ChatMessage> & {
   session_id?: string;
   workspace_id?: string;
   timestamp?: string;
+  file_metadata?: Record<string, FileMetadata>;
 };
 
 export type BackendChatSession = Partial<ChatSession> & {
