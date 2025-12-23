@@ -66,6 +66,7 @@ pub fn emit_ai_response(
     done: bool,
     session_id: Option<&str>,
     workspace_id: Option<&str>,
+    code_cli_task_id: Option<&str>,
 ) -> AppResult<()> {
     let payload = serde_json::json!({
         "request_id": request_id,
@@ -73,6 +74,7 @@ pub fn emit_ai_response(
         "done": done,
         "session_id": session_id,
         "workspace_id": workspace_id,
+        "code_cli_task_id": code_cli_task_id,
         "timestamp": chrono::Utc::now().to_rfc3339(),
     });
 

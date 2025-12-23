@@ -10,6 +10,8 @@ import type {
   FileContent,
   ChatSession,
   ChatMessage,
+  BackendChatSession,
+  BackendChatMessage,
 } from '@/utils/types';
 
 export type CodeagentWrapperExecResult = {
@@ -102,10 +104,11 @@ export async function sendChatMessageStreaming(
   contextFiles?: string[],
   codeCli?: string,
   codexModel?: string,
-  sessionId?: string,
+  sessionId?: string | null,
   workspaceId?: string,
   workspaceDir?: string,
   codeCliChanged?: boolean,
+  codeCliTaskId?: string | null,
 ): Promise<string> {
   return invoke('send_chat_message_streaming', {
     message,
@@ -116,6 +119,7 @@ export async function sendChatMessageStreaming(
     workspaceId,
     workspaceDir,
     codeCliChanged,
+    codeCliTaskId,
   });
 }
 
@@ -347,22 +351,56 @@ export async function clearRecentDirectories(): Promise<void> {
 }
 
 // Chat session commands
+function normalizeChatMessage(message: BackendChatMessage): ChatMessage {
+  return {
+    id: message.id || '',
+    role: message.role || 'assistant',
+    content: message.content || '',
+    sessionId: message.sessionId || message.session_id || '',
+    workspaceId: message.workspaceId || message.workspace_id || '',
+    timestamp: message.timestamp || '',
+    files: message.files || [],
+    model: message.model,
+  };
+}
+
+function normalizeChatSession(session: BackendChatSession): ChatSession {
+  const normalizedMessages = (session.messages || []).map(normalizeChatMessage);
+  const messageCount =
+    session.messageCount ?? session.message_count ?? normalizedMessages.length;
+
+  return {
+    id: session.id,
+    name: session.name,
+    sessionId: session.sessionId || session.session_id || '',
+    workspaceId: session.workspaceId || session.workspace_id || '',
+    messages: normalizedMessages,
+    createdAt: session.createdAt || session.created_at || '',
+    updatedAt: session.updatedAt || session.updated_at || '',
+    messageCount,
+    firstMessagePreview: session.firstMessagePreview || session.first_message_preview || '',
+    codeCliTaskIds: session.codeCliTaskIds || session.code_cli_task_ids || {},
+  };
+}
+
 export async function saveChatSession(
   sessionId: string | null,
   name: string | null,
   messages: ChatMessage[],
   codeagentSessionId?: string | null
 ): Promise<ChatSession> {
-  return invoke('save_chat_session', {
+  const session = await invoke<BackendChatSession>('save_chat_session', {
     sessionId,
     name,
     messages,
     codeagent_session_id: codeagentSessionId,
   });
+  return normalizeChatSession(session);
 }
 
 export async function loadChatSessions(workspaceId: string, limit?: number): Promise<ChatSession[]> {
-  return invoke('load_chat_sessions', { workspaceId, limit });
+  const sessions = await invoke<BackendChatSession[]>('load_chat_sessions', { workspaceId, limit });
+  return sessions.map((session) => normalizeChatSession(session));
 }
 
 export async function deleteChatSession(sessionId: string): Promise<void> {
@@ -370,5 +408,6 @@ export async function deleteChatSession(sessionId: string): Promise<void> {
 }
 
 export async function updateChatSessionName(sessionId: string, name: string): Promise<ChatSession> {
-  return invoke('update_chat_session_name', { sessionId, name });
+  const session = await invoke<BackendChatSession>('update_chat_session_name', { sessionId, name });
+  return normalizeChatSession(session);
 }

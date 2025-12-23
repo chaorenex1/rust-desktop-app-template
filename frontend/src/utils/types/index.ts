@@ -228,6 +228,7 @@ export interface ChatSession {
   updatedAt: string;
   messageCount: number;
   firstMessagePreview: string;
+  codeCliTaskIds?: Record<string, string>;
 }
 
 export interface AiResponseEventPayload {
@@ -236,8 +237,27 @@ export interface AiResponseEventPayload {
   done: boolean;
   session_id?: string | null;
   workspace_id?: string | null;
+  code_cli_task_id?: string | null;
   timestamp: string;
 }
+
+export type BackendChatMessage = Partial<ChatMessage> & {
+  session_id?: string;
+  workspace_id?: string;
+  timestamp?: string;
+};
+
+export type BackendChatSession = Partial<ChatSession> & {
+  id: string;
+  messages?: BackendChatMessage[];
+  created_at?: string;
+  updated_at?: string;
+  message_count?: number;
+  first_message_preview?: string;
+  session_id?: string;
+  workspace_id?: string;
+  code_cli_task_ids?: Record<string, string>;
+};
 
 // Terminal types
 export interface TerminalSession {

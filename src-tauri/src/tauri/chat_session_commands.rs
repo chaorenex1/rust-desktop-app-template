@@ -18,7 +18,13 @@ pub async fn save_chat_session(
         messages.len()
     );
 
-    match chat_session::save_session(session_id, name, codeagent_session_id, messages) {
+    match chat_session::save_session(
+        session_id,
+        name,
+        codeagent_session_id,
+        messages,
+        None,
+    ) {
         Ok(session) => {
             debug!("Successfully saved chat session: {}", session.id);
             Ok(session)
